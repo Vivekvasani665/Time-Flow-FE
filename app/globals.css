@@ -1,0 +1,269 @@
+@import "tailwindcss";
+
+/* ───────────────────────────────────────────────────────────
+   TimeFlow — design tokens
+   Neutral surfaces, one accent, restrained status colours.
+   Token names are historical (the accent slot is still called
+   "cyan", success is "lime"); components reference them in
+   hundreds of places, so the values changed, not the names.
+   ─────────────────────────────────────────────────────────── */
+@theme {
+  --color-void: #f6f7f9;
+  --color-abyss: #ffffff;
+  --color-panel: #ffffff;
+  --color-panel-2: #f9fafb;
+  --color-panel-3: #f1f3f6;
+  --color-line: #e6e8ec;
+  --color-line-bright: #d3d7de;
+
+  --color-ink: #111827;
+  --color-ink-dim: #4b5563;
+  --color-ink-mute: #6b7280;
+
+  --color-cyan: #4f46e5;
+  --color-cyan-deep: #4338ca;
+  --color-violet: #7c3aed;
+  --color-magenta: #db2777;
+  --color-lime: #047857;
+  --color-amber: #b45309;
+  --color-danger: #dc2626;
+  --color-blue: #2563eb;
+
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SF Mono", Menlo, monospace;
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-pulse-glow: pulse-glow 2.4s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --radius: 0.75rem;
+    --radius-sm: 0.5rem;
+
+    --selection-ink: #111827;
+    --color-backdrop: #eef0f4;
+    --color-silver: #64748b;
+    --color-bronze: #92400e;
+    --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+    --shadow-overlay: 0 12px 32px -8px rgb(16 24 40 / 0.16), 0 2px 6px rgb(16 24 40 / 0.06);
+    --shadow-dialog: 0 24px 64px -16px rgb(16 24 40 / 0.24);
+    --ring: 0 0 0 3px color-mix(in oklab, var(--color-cyan) 22%, transparent);
+
+    /* Table/list row padding — the single knob behind the density setting. */
+    --row-py: 0.75rem;
+  }
+
+  /* ── Dark theme ───────────────────────────────────────────
+     Same token names, dark values. Every colour utility compiles to
+     a var(--color-…) reference, so the whole app follows along. */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-void: #0b0d12;
+    --color-abyss: #0f1117;
+    --color-panel: #13161d;
+    --color-panel-2: #171a22;
+    --color-panel-3: #1e222c;
+    --color-line: #262a35;
+    --color-line-bright: #353b48;
+
+    --color-ink: #e8eaef;
+    --color-ink-dim: #a6acb9;
+    --color-ink-mute: #7f8695;
+
+    --color-cyan: #818cf8;
+    --color-cyan-deep: #6366f1;
+    --color-violet: #a78bfa;
+    --color-magenta: #f472b6;
+    --color-lime: #34d399;
+    --color-amber: #fbbf24;
+    --color-danger: #f87171;
+    --color-blue: #60a5fa;
+
+    --selection-ink: #fff;
+    --color-backdrop: #11141b;
+    --color-silver: #cbd5e1;
+    --color-bronze: #f59e0b;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-overlay: 0 16px 40px -12px rgb(0 0 0 / 0.6);
+    --shadow-dialog: 0 28px 72px -20px rgb(0 0 0 / 0.7);
+  }
+
+  /* ── Accent ───────────────────────────────────────────────
+     Stored preference keys are kept; only the hues changed.
+     cyan → indigo (default), violet, magenta → rose, lime → emerald,
+     amber. */
+  :root[data-accent="violet"] { --color-cyan: #7c3aed; --color-cyan-deep: #6d28d9; }
+  :root[data-accent="magenta"] { --color-cyan: #e11d48; --color-cyan-deep: #be123c; }
+  :root[data-accent="lime"] { --color-cyan: #059669; --color-cyan-deep: #047857; }
+  :root[data-accent="amber"] { --color-cyan: #d97706; --color-cyan-deep: #b45309; }
+
+  :root[data-theme="dark"][data-accent="violet"] { --color-cyan: #a78bfa; --color-cyan-deep: #8b5cf6; }
+  :root[data-theme="dark"][data-accent="magenta"] { --color-cyan: #fb7185; --color-cyan-deep: #f43f5e; }
+  :root[data-theme="dark"][data-accent="lime"] { --color-cyan: #34d399; --color-cyan-deep: #10b981; }
+  :root[data-theme="dark"][data-accent="amber"] { --color-cyan: #fbbf24; --color-cyan-deep: #f59e0b; }
+
+  :root[data-density="compact"] { --row-py: 0.375rem; }
+
+  html {
+    background: var(--color-void);
+  }
+
+  body {
+    background: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-cyan) 22%, transparent);
+    color: var(--selection-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-cyan);
+    outline-offset: 2px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-bright) transparent;
+  }
+
+  :root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.75);
+    cursor: pointer;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────
+   Surface primitives. The names survive from the earlier design;
+   what they draw is a plain rounded card.
+   ─────────────────────────────────────────────────────────── */
+/* Rounded, and clips its children the way the old chamfer did. */
+@utility clip-corner {
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+@utility clip-corner-sm {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+@utility clip-tag {
+  border-radius: 9999px;
+}
+
+/* Headings and labels: the body face, slightly tightened. */
+@utility font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+@utility text-glow {
+  text-shadow: none;
+}
+
+@utility glow-cyan {
+  box-shadow: var(--ring);
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Small uppercase section label, the one place caps are used. */
+@utility eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-mute);
+}
+
+@layer components {
+  .hud-panel {
+    position: relative;
+    background: var(--color-panel);
+    border: 1px solid var(--color-line);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Decorations from the earlier design, now inert. */
+  .hud-brackets::before,
+  .hud-brackets::after,
+  .hud-grid,
+  .scanlines {
+    display: none;
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--color-panel-3) 0%, var(--color-panel-2) 50%, var(--color-panel-3) 100%);
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+
+  .field-input {
+    width: 100%;
+    background: var(--color-panel);
+    border: 1px solid var(--color-line-bright);
+    border-radius: var(--radius-sm);
+    color: var(--color-ink);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9375rem;
+    box-shadow: 0 1px 2px rgb(16 24 40 / 0.04);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field-input::placeholder {
+    color: var(--color-ink-mute);
+  }
+  .field-input:hover {
+    border-color: color-mix(in oklab, var(--color-ink) 25%, var(--color-line-bright));
+  }
+  .field-input:focus {
+    outline: none;
+    border-color: var(--color-cyan);
+    box-shadow: var(--ring);
+  }
+  .field-input[aria-invalid="true"] {
+    border-color: var(--color-danger);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-danger) 15%, transparent);
+  }
+  .field-input:disabled {
+    background: var(--color-panel-2);
+    color: var(--color-ink-dim);
+    cursor: not-allowed;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
