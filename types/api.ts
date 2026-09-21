@@ -281,6 +281,15 @@ export type ProjectInput = {
   managerId: string;
   memberIds?: string[];
 };
+export type ProjectStats = {
+  total: number;
+  byStatus: { status: ProjectStatus; count: number }[];
+  newThisWeek: number;
+  /** Distinct people (managers and members) across the visible projects. */
+  members: number;
+  membersAddedThisWeek: number;
+};
+
 export type ProjectListParams = ListParams & {
   status?: ProjectStatus;
   priority?: Priority;

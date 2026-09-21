@@ -3,7 +3,7 @@ import type { Priority, ProjectStatus, TaskStatus, UserStatus } from "@/types/ap
 export type Tone = "cyan" | "violet" | "magenta" | "lime" | "amber" | "red" | "blue" | "gray";
 
 export const PROJECT_STATUS: Record<ProjectStatus, { label: string; tone: Tone }> = {
-  PLANNING: { label: "Planning", tone: "blue" },
+  PLANNING: { label: "Planning", tone: "magenta" },
   ACTIVE: { label: "Active", tone: "cyan" },
   ON_HOLD: { label: "On hold", tone: "amber" },
   COMPLETED: { label: "Completed", tone: "lime" },
@@ -66,4 +66,13 @@ export function humanize(value: string) {
   return value
     .replace(/[._]/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** "task.created" → "Task created"; "auth.login" → "User login". */
+export function actionLabel(action: string) {
+  if (action === "auth.login") return "User login";
+  if (action === "auth.logout") return "User logout";
+  const [entity = "", verb = ""] = action.split(".");
+  const noun = ENTITY_LABELS[entity] ?? humanize(entity);
+  return verb ? `${noun} ${humanize(verb).toLowerCase()}` : noun;
 }

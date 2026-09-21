@@ -1,7 +1,7 @@
 "use client";
 
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipContentProps, type TooltipValueType } from "recharts";
-import { ENTITY_LABELS, humanize } from "@/lib/labels";
+import { actionLabel } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import type { ActivityStats } from "@/types/api";
 
@@ -84,15 +84,6 @@ export function ActivityTrend({ days }: { days: ActivityStats["days"] }) {
       </table>
     </div>
   );
-}
-
-/** "task.created" → "Task created"; "auth.login" → "User login". */
-export function actionLabel(action: string) {
-  if (action === "auth.login") return "User login";
-  if (action === "auth.logout") return "User logout";
-  const [entity = "", verb = ""] = action.split(".");
-  const noun = ENTITY_LABELS[entity] ?? humanize(entity);
-  return verb ? `${noun} ${humanize(verb).toLowerCase()}` : noun;
 }
 
 /** Bar colour follows the verb, so "created" reads the same for tasks and projects. */

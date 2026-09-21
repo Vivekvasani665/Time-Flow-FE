@@ -35,10 +35,10 @@ import { EmptyState, ErrorState } from "@/components/ui/states";
 import { TONE } from "@/components/ui/tone";
 import { useActivityStats } from "@/hooks/use-activity";
 import { useDashboard } from "@/hooks/use-dashboard";
-import { PROJECT_STATUS } from "@/lib/labels";
+import { PROJECT_STATUS, actionLabel } from "@/lib/labels";
 import { cn, percent } from "@/lib/utils";
 import type { DashboardData } from "@/types/api";
-import { ActionBars, ActivityTrend, actionLabel } from "./charts";
+import { ActionBars, ActivityTrend } from "./charts";
 import { StatTile } from "./stat-tile";
 
 function greeting() {

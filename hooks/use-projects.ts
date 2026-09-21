@@ -14,6 +14,10 @@ export function useProjects(params: ProjectListParams, enabled = true) {
   });
 }
 
+export function useProjectStats() {
+  return useQuery({ queryKey: queryKeys.projects.stats, queryFn: projectsService.stats });
+}
+
 export function useProject(id: string, enabled = true) {
   return useQuery({ queryKey: queryKeys.projects.detail(id), queryFn: () => projectsService.get(id), enabled: enabled && Boolean(id) });
 }
