@@ -62,10 +62,10 @@ export function SignupForm({ onSuccess }: { onSuccess: (user: AuthUser) => void 
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="First name" htmlFor="firstName" error={errors.firstName?.message} required>
-          <Input {...fieldA11y("firstName", errors.firstName?.message)} autoComplete="given-name" className="h-10" {...register("firstName")} />
+          <Input {...fieldA11y("firstName", errors.firstName?.message)} autoComplete="given-name" className="h-12 rounded-xl" {...register("firstName")} />
         </Field>
         <Field label="Last name" htmlFor="lastName" error={errors.lastName?.message} required>
-          <Input {...fieldA11y("lastName", errors.lastName?.message)} autoComplete="family-name" className="h-10" {...register("lastName")} />
+          <Input {...fieldA11y("lastName", errors.lastName?.message)} autoComplete="family-name" className="h-12 rounded-xl" {...register("lastName")} />
         </Field>
       </div>
 
@@ -75,7 +75,7 @@ export function SignupForm({ onSuccess }: { onSuccess: (user: AuthUser) => void 
           type="email"
           autoComplete="email"
           placeholder="you@company.com"
-          className="h-10"
+          className="h-12 rounded-xl"
           {...register("email")}
         />
       </Field>
@@ -87,7 +87,7 @@ export function SignupForm({ onSuccess }: { onSuccess: (user: AuthUser) => void 
             type={showPassword ? "text" : "password"}
             autoComplete="new-password"
             placeholder="••••••••"
-            className="h-10 pr-10"
+            className="h-12 rounded-xl pr-11"
             {...register("password")}
           />
           <button
@@ -101,7 +101,7 @@ export function SignupForm({ onSuccess }: { onSuccess: (user: AuthUser) => void 
         </div>
       </Field>
 
-      <Button type="submit" size="lg" className="w-full" loading={isSubmitting}>
+      <Button type="submit" size="lg" className="h-12 w-full rounded-xl text-base" loading={isSubmitting}>
         {isSubmitting ? "Creating account…" : "Create account"}
       </Button>
     </form>

@@ -1,13 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { AlertTriangle, ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Field, fieldA11y } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Input, InputWithIcon } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { isApiError } from "@/lib/api/client";
 import { authService } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
@@ -20,10 +21,10 @@ export const loginSchema = z.object({
 export type LoginValues = z.infer<typeof loginSchema>;
 
 export const DEMO_ACCOUNTS = [
-  { role: "Super Admin", email: "superadmin@timeflow.dev" },
-  { role: "Admin", email: "admin@timeflow.dev" },
-  { role: "Manager", email: "manager@timeflow.dev" },
-  { role: "Employee", email: "employee@timeflow.dev" },
+  { role: "Super Admin", email: "superadmin@timeflow.dev", initials: "SA", tone: "bg-blue" },
+  { role: "Admin", email: "admin@timeflow.dev", initials: "AD", tone: "bg-lime" },
+  { role: "Manager", email: "manager@timeflow.dev", initials: "MN", tone: "bg-violet" },
+  { role: "Employee", email: "employee@timeflow.dev", initials: "EM", tone: "bg-amber" },
 ] as const;
 
 export const DEMO_PASSWORD = "Password123!";
@@ -74,31 +75,35 @@ export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }
         </div>
       )}
 
-      <Field label="Email" htmlFor="email" error={errors.email?.message} required>
-        <Input
+      <Field label="Email address" htmlFor="email" error={errors.email?.message} required>
+        <InputWithIcon
           {...fieldA11y("email", errors.email?.message)}
+          icon={<Mail className="size-4" />}
           type="email"
           autoComplete="email"
           placeholder="you@company.com"
-          className="h-10"
+          className="h-12 rounded-xl pl-10"
           {...register("email")}
         />
       </Field>
 
       <Field label="Password" htmlFor="password" error={errors.password?.message} required>
         <div className="relative">
+          <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-ink-mute" aria-hidden="true">
+            <Lock className="size-4" />
+          </span>
           <Input
             {...fieldA11y("password", errors.password?.message)}
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
             placeholder="••••••••"
-            className="h-10 pr-10"
+            className="h-12 rounded-xl pr-11 pl-10"
             {...register("password")}
           />
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute top-1/2 right-1.5 z-10 -translate-y-1/2 rounded-md p-1.5 text-ink-mute hover:text-ink"
+            className="absolute top-1/2 right-2 z-10 -translate-y-1/2 rounded-md p-1.5 text-ink-mute hover:text-ink"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -106,18 +111,19 @@ export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }
         </div>
       </Field>
 
-      <Button type="submit" size="lg" className="w-full" loading={isSubmitting}>
+      <Button type="submit" size="lg" className="h-12 w-full rounded-xl text-base" loading={isSubmitting}>
         {isSubmitting ? "Signing in…" : "Sign in"}
+        {!isSubmitting && <ArrowRight className="size-4" aria-hidden="true" />}
       </Button>
 
       {SHOW_DEMO_ACCOUNTS && (
-        <div className="space-y-3 pt-2">
+        <div className="space-y-4 pt-2">
           <p className="flex items-center gap-3 text-xs text-ink-mute">
             <span className="h-px flex-1 bg-line" />
-            Demo accounts
+            or continue with a demo account
             <span className="h-px flex-1 bg-line" />
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             {DEMO_ACCOUNTS.map((account) => (
               <button
                 key={account.email}
@@ -127,15 +133,24 @@ export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }
                   setValue("email", account.email, { shouldValidate: true });
                   setValue("password", DEMO_PASSWORD, { shouldValidate: true });
                 }}
-                className="group flex flex-col items-start gap-0.5 rounded-lg border border-line bg-panel px-3 py-2 text-left transition hover:border-line-bright hover:bg-panel-2"
+                className="flex items-center gap-2.5 rounded-xl border border-line bg-panel px-3 py-3 text-left transition hover:border-cyan/40 hover:bg-panel-2"
               >
-                <span className="text-sm font-medium text-ink">{account.role}</span>
-                <span className="w-full truncate text-xs text-ink-mute">{account.email}</span>
+                <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-semibold text-white", account.tone)} aria-hidden="true">
+                  {account.initials}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-ink">{account.role}</span>
+                  <span className="block truncate text-xs text-ink-mute">{account.email}</span>
+                </span>
               </button>
             ))}
           </div>
         </div>
       )}
+
+      <p className="border-t border-line pt-5 text-center text-xs text-ink-mute">
+        Forgot your password? <span className="text-ink-dim">Ask your workspace administrator to reset it.</span>
+      </p>
     </form>
   );
 }
