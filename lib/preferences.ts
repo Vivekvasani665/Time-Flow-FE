@@ -71,6 +71,7 @@ export function resolveTheme(theme: Theme): "dark" | "light" {
 export function applyPreferences(prefs: Preferences): void {
   const root = document.documentElement;
   root.dataset.theme = resolveTheme(prefs.theme);
-  root.dataset.accent = prefs.accent;
+  // The accent picker was removed; always use the default so an old saved choice can't stick.
+  root.dataset.accent = DEFAULT_PREFERENCES.accent;
   root.dataset.density = prefs.density;
 }

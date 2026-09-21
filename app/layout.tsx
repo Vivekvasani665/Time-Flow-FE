@@ -32,7 +32,7 @@ var p=JSON.parse(localStorage.getItem("tf.preferences")||"{}");
 var t=p.theme==="light"||p.theme==="dark"?p.theme:p.theme==="system"?(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"):"light";
 var d=document.documentElement;
 d.dataset.theme=t;
-d.dataset.accent=p.accent||"cyan";
+d.dataset.accent="cyan";
 d.dataset.density=p.density||"comfortable";
 }catch(e){}})();`;
 
