@@ -21,23 +21,20 @@ export function EntityIcon({ entity }: { entity: string }) {
   );
 }
 
-/** Compact timeline used on the dashboard. */
-export function ActivityFeed({ items }: { items: ActivityLog[] }) {
+/** Compact timeline used on the dashboard: who, what, and when. */
+export function ActivityFeed({ items, describeAction }: { items: ActivityLog[]; describeAction?: (action: string) => string }) {
   return (
-    <ol className="space-y-1">
+    <ol className="space-y-4">
       {items.map((log) => (
-        <li key={log.id} className="relative flex gap-3 py-2">
-          <EntityIcon entity={log.entity} />
+        <li key={log.id} className="flex items-start gap-3">
+          {log.user ? <Avatar user={log.user} size="sm" /> : <EntityIcon entity={log.entity} />}
           <div className="min-w-0 flex-1">
-            <p className="text-sm leading-snug text-ink">{log.description}</p>
-            <p className="mt-0.5 flex items-center gap-2 text-xs text-ink-mute">
-              {log.user && <Avatar user={log.user} size="xs" className="size-4 text-[0.45rem]" />}
-              <span className="tabular" title={formatDateTime(log.createdAt)}>
-                {timeAgo(log.createdAt)}
-              </span>
-              <span className="font-mono text-[0.6875rem] text-ink-mute">{log.action}</span>
-            </p>
+            <p className="line-clamp-2 text-sm leading-snug text-ink">{log.description}</p>
+            <p className="mt-0.5 truncate text-xs text-ink-mute">{describeAction ? describeAction(log.action) : log.action}</p>
           </div>
+          <span className="tabular shrink-0 text-xs whitespace-nowrap text-ink-mute" title={formatDateTime(log.createdAt)}>
+            {timeAgo(log.createdAt)}
+          </span>
         </li>
       ))}
     </ol>

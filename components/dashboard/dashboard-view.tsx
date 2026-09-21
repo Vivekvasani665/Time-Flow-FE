@@ -1,21 +1,44 @@
 "use client";
 
-import { Activity, CheckCircle2, CircleDot, FolderKanban, FolderOpen, ListChecks, ListTodo, PieChart, Plus, UserCheck, Users } from "lucide-react";
+import {
+  Activity,
+  ArrowRight,
+  BarChart3,
+  CalendarDays,
+  CheckCircle2,
+  CircleAlert,
+  ClipboardCheck,
+  ClipboardList,
+  Clock,
+  FilePlus2,
+  FolderKanban,
+  FolderOpen,
+  ListChecks,
+  ListTree,
+  PieChart,
+  PlusCircle,
+  Settings,
+  SquareCheckBig,
+  UserPlus,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
-import { useAuth, usePermissions } from "@/components/auth/auth-provider";
+import { useState, type ReactNode } from "react";
 import { ActivityFeed } from "@/components/activity/activity-feed";
-import { TaskRows } from "@/components/tasks/task-list-compact";
-import { AvatarStack } from "@/components/ui/avatar";
+import { useAuth, usePermissions } from "@/components/auth/auth-provider";
 import { ProjectStatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
-import { Panel } from "@/components/ui/panel";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
-import { XpBar } from "@/components/ui/xp-bar";
+import { TONE } from "@/components/ui/tone";
+import { useActivityStats } from "@/hooks/use-activity";
 import { useDashboard } from "@/hooks/use-dashboard";
-import { percent } from "@/lib/utils";
-import { ProjectStatusBars, TaskStatusDonut } from "./charts";
+import { PROJECT_STATUS } from "@/lib/labels";
+import { cn, percent } from "@/lib/utils";
+import type { DashboardData } from "@/types/api";
+import { ActionBars, ActivityTrend, actionLabel } from "./charts";
 import { StatTile } from "./stat-tile";
 
 function greeting() {
@@ -23,31 +46,198 @@ function greeting() {
   return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
 }
 
+const today = () => new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+
+const shortDate = (value: string) => new Date(value).toLocaleDateString(undefined, { month: "short", day: "2-digit" });
+
+/** Dashboard card: title row (optional icon, subtitle, actions) above free-form content. */
+function Card({ title, subtitle, icon: Icon, actions, className, children }: { title: string; subtitle?: string; icon?: LucideIcon; actions?: ReactNode; className?: string; children: ReactNode }) {
+  return (
+    <section className={cn("hud-panel flex flex-col rounded-2xl p-5", className)}>
+      <header className="mb-5 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          {Icon && <Icon className="mt-0.5 size-5 shrink-0 text-cyan" aria-hidden="true" />}
+          <div className="min-w-0">
+            <h2 className="truncate font-semibold text-ink">{title}</h2>
+            {subtitle && <p className="mt-0.5 truncate text-xs text-ink-mute">{subtitle}</p>}
+          </div>
+        </div>
+        {actions}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function ViewAll({ href }: { href: string }) {
+  return (
+    <Link href={href} className="flex shrink-0 items-center gap-1 text-xs font-medium text-cyan hover:underline">
+      View all <ArrowRight className="size-3" aria-hidden="true" />
+    </Link>
+  );
+}
+
+const RANGES = [
+  { value: "7", label: "Last 7 days" },
+  { value: "14", label: "Last 14 days" },
+  { value: "30", label: "Last 30 days" },
+];
+
+function ActivityCards() {
+  const [range, setRange] = useState("7");
+  const days = Number(range);
+  const from = new Date(Date.now() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
+  const query = useActivityStats({ from });
+  const stats = query.data;
+
+  return (
+    <>
+      <Card
+        title="Activity Trend"
+        subtitle={stats ? `${stats.total.toLocaleString()} activities in the last ${days} days` : `Total activities in the last ${days} days`}
+        icon={BarChart3}
+        className="lg:col-span-2 2xl:col-span-5"
+        actions={<Select aria-label="Time range" className="h-8 w-36 text-xs" value={range} onValueChange={(v) => setRange(v ?? "7")} options={RANGES} />}
+      >
+        {query.isLoading ? (
+          <Skeleton className="h-56" />
+        ) : query.error && !stats ? (
+          <ErrorState message={query.error.message} onRetry={() => void query.refetch()} className="py-6" />
+        ) : stats ? (
+          <div className={cn("transition-opacity", query.isFetching && "opacity-70")}>
+            <ActivityTrend days={stats.days} />
+          </div>
+        ) : null}
+      </Card>
+
+      <Card title="Activity by Action" icon={ListTree} className="2xl:col-span-4" subtitle={`Last ${days} days`}>
+        {query.isLoading ? (
+          <div className="space-y-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-5" />
+            ))}
+          </div>
+        ) : stats && stats.byAction.length > 0 ? (
+          <ActionBars data={stats.byAction} />
+        ) : stats ? (
+          <p className="py-6 text-center text-sm text-ink-mute">No activity in this range.</p>
+        ) : null}
+      </Card>
+    </>
+  );
+}
+
+const QUICK_ACTIONS: { label: string; href: string; icon: LucideIcon; permission?: string; className: string }[] = [
+  { label: "New Project", href: "/projects/new", icon: PlusCircle, permission: "projects.create", className: "bg-cyan/10 text-cyan hover:bg-cyan/15" },
+  { label: "New Task", href: "/tasks/new", icon: FilePlus2, permission: "tasks.create", className: "bg-lime/10 text-lime hover:bg-lime/15" },
+  { label: "Add User", href: "/users/new", icon: UserPlus, permission: "users.create", className: "bg-blue/10 text-blue hover:bg-blue/15" },
+  { label: "Settings", href: "/settings", icon: Settings, className: "bg-magenta/10 text-magenta hover:bg-magenta/15" },
+];
+
+function QuickActions({ can }: { can: (permission: string) => boolean }) {
+  const actions = QUICK_ACTIONS.filter((a) => !a.permission || can(a.permission));
+  return (
+    <Card title="Quick Actions" className="2xl:col-span-3">
+      <div className="grid flex-1 grid-cols-2 gap-3">
+        {actions.map(({ label, href, icon: Icon, className }) => (
+          <Link key={href} href={href} className={cn("flex min-h-24 flex-col items-center justify-center gap-2.5 rounded-xl p-3 text-sm font-medium transition-colors", className)}>
+            <Icon className="size-7" aria-hidden="true" />
+            {label}
+          </Link>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function RecentProjects({ projects, canCreate }: { projects: DashboardData["recentProjects"]; canCreate: boolean }) {
+  return (
+    <Card title="Recent Projects" icon={FolderOpen} className="lg:col-span-2 2xl:col-span-5" actions={<ViewAll href="/projects" />}>
+      {projects.length === 0 ? (
+        <EmptyState
+          title="No projects found"
+          description="Create your first project to get started."
+          action={canCreate ? <ButtonLink href="/projects/new" size="sm">New project</ButtonLink> : undefined}
+          className="py-6"
+        />
+      ) : (
+        <ul className="-mx-2 space-y-1">
+          {projects.map((p) => {
+            const done = percent(p.taskStats.completed, p.taskStats.total);
+            const tone = TONE[PROJECT_STATUS[p.status].tone];
+            return (
+              <li key={p.id}>
+                <Link
+                  href={`/projects/${p.id}`}
+                  className="group grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-panel-2 sm:grid-cols-[auto_minmax(0,1fr)_7.5rem_auto_5.5rem]"
+                >
+                  <span className={cn("flex size-8 items-center justify-center rounded-lg", tone.bg, tone.text)} aria-hidden="true">
+                    <FolderKanban className="size-4" />
+                  </span>
+                  <span className="truncate text-sm font-medium text-ink group-hover:text-cyan">{p.name}</span>
+                  <span className="hidden items-center gap-2.5 sm:flex">
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-panel-3" aria-hidden="true">
+                      <span className="block h-full rounded-full bg-cyan" style={{ width: `${done}%` }} />
+                    </span>
+                    <span className="tabular w-9 text-right text-xs text-ink-mute">{done}%</span>
+                  </span>
+                  <ProjectStatusBadge status={p.status} />
+                  <span className="tabular hidden text-right text-xs text-ink-mute sm:block">{p.endDate ? `Due ${shortDate(p.endDate)}` : "No due date"}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function StayProductive({ openTasks, canViewTasks }: { openTasks: number; canViewTasks: boolean }) {
+  return (
+    <section className="hud-panel rounded-2xl p-3 2xl:col-span-3">
+      <div className="flex h-full flex-col items-center justify-center rounded-xl bg-cyan/[0.06] px-5 py-7 text-center">
+        <span className="relative mb-4 flex size-16 items-center justify-center rounded-2xl border border-line bg-panel text-cyan shadow-sm" aria-hidden="true">
+          <ClipboardList className="size-8" strokeWidth={1.5} />
+          <span className="absolute -right-2 -bottom-2 flex size-7 items-center justify-center rounded-full bg-cyan text-white ring-4 ring-panel">
+            <Clock className="size-3.5" />
+          </span>
+        </span>
+        <h2 className="text-lg font-semibold text-cyan">Stay productive!</h2>
+        <p className="mt-1.5 max-w-xs text-sm text-ink-mute">
+          {openTasks === 0 ? "You have no open tasks right now. Nice work." : `You have ${openTasks} open ${openTasks === 1 ? "task" : "tasks"} assigned to you.`}
+        </p>
+        {canViewTasks && (
+          <ButtonLink href="/tasks?assigneeId=me" className="mt-5 px-6">
+            View my tasks <ArrowRight className="size-4" aria-hidden="true" />
+          </ButtonLink>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function DashboardView() {
   const { user } = useAuth();
   const { can } = usePermissions();
   const { data, isLoading, error, refetch } = useDashboard();
+  const canViewActivity = can("activity_logs.view");
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={`${greeting()}, ${user?.firstName ?? "there"}`}
-        description="Here's an overview of your projects and tasks."
-        actions={
-          <>
-            {can("tasks.create") && (
-              <ButtonLink href="/tasks/new" variant="secondary" icon={<Plus className="size-4" />}>
-                New task
-              </ButtonLink>
-            )}
-            {can("projects.create") && (
-              <ButtonLink href="/projects/new" icon={<Plus className="size-4" />}>
-                New project
-              </ButtonLink>
-            )}
-          </>
-        }
-      />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight text-ink sm:text-[1.75rem]">
+            <span aria-hidden="true">👋</span>
+            {greeting()}, {user?.firstName ?? "there"}!
+          </h1>
+          <p className="mt-1.5 text-ink-mute">Here&apos;s what&apos;s happening with your projects and team today.</p>
+        </div>
+        <p className="flex h-10 items-center gap-2 rounded-xl border border-line bg-panel px-3.5 text-sm font-medium text-ink shadow-[var(--shadow-card)]">
+          <CalendarDays className="size-4 text-ink-mute" aria-hidden="true" />
+          {today()}
+        </p>
+      </div>
 
       {error && !data ? (
         <div className="hud-panel clip-corner">
@@ -57,122 +247,58 @@ export function DashboardView() {
         <DashboardSkeleton />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-6">
-            <StatTile label="Total users" value={data.stats.totalUsers} icon={Users} tone="cyan" caption={data.stats.totalUsers === null ? "No access" : "All accounts"} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <StatTile
-              label="Active users"
-              value={data.stats.activeUsers}
-              icon={UserCheck}
-              tone="lime"
-              ratio={data.stats.totalUsers ? percent(data.stats.activeUsers ?? 0, data.stats.totalUsers) : undefined}
-              caption={data.stats.totalUsers ? `${percent(data.stats.activeUsers ?? 0, data.stats.totalUsers)}% active` : "No access"}
+              label="Total Users"
+              value={data.stats.totalUsers}
+              icon={Users}
+              tone="cyan"
+              accent={Users}
+              caption={data.stats.totalUsers === null ? "No access" : `${data.stats.activeUsers ?? 0} active`}
             />
-            <StatTile label="Total projects" value={data.stats.totalProjects} icon={FolderKanban} tone="violet" caption="All projects" />
+            <StatTile label="Total Projects" value={data.stats.totalProjects} icon={CheckCircle2} tone="lime" accent={BarChart3} caption={`${data.stats.activeProjects} in progress`} />
+            <StatTile label="Total Tasks" value={data.stats.totalTasks} icon={ClipboardCheck} tone="blue" accent={ListChecks} caption={`${data.myTasks.length} assigned to you`} />
             <StatTile
-              label="Active projects"
+              label="Active Projects"
               value={data.stats.activeProjects}
-              icon={CircleDot}
+              icon={CircleAlert}
               tone="magenta"
-              ratio={percent(data.stats.activeProjects, data.stats.totalProjects)}
-              caption="In progress"
+              accent={PieChart}
+              caption={`${percent(data.stats.activeProjects, data.stats.totalProjects)}% of projects`}
             />
-            <StatTile label="Total tasks" value={data.stats.totalTasks} icon={ListChecks} tone="amber" caption="All tasks" />
             <StatTile
-              label="Completed tasks"
+              label="Completed Tasks"
               value={data.stats.completedTasks}
-              icon={CheckCircle2}
-              tone="lime"
-              ratio={percent(data.stats.completedTasks, data.stats.totalTasks)}
+              icon={SquareCheckBig}
+              tone="amber"
+              accent={Activity}
               caption={`${percent(data.stats.completedTasks, data.stats.totalTasks)}% completed`}
             />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-3">
-            <Panel title="Tasks by status" icon={<PieChart />}>
-              <TaskStatusDonut data={data.tasksByStatus} />
-            </Panel>
-            <Panel title="Projects by status" icon={<FolderKanban />}>
-              <ProjectStatusBars data={data.projectsByStatus} />
-            </Panel>
-            <Panel
-              title="My open tasks"
-              icon={<ListTodo />}
-              actions={
-                can("tasks.view") && (
-                  <Link href="/tasks?assigneeId=me" className="text-xs font-medium text-cyan hover:underline">
-                    View all
-                  </Link>
-                )
-              }
-            >
-              {data.myTasks.length === 0 ? (
-                <EmptyState title="No open tasks" description="Nothing is assigned to you right now." className="py-6" />
-              ) : (
-                <TaskRows tasks={data.myTasks} />
-              )}
-            </Panel>
+          <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-12">
+            {canViewActivity ? (
+              <ActivityCards />
+            ) : (
+              <Card title="Activity" icon={BarChart3} className="lg:col-span-2 2xl:col-span-9">
+                <EmptyState title="No access" description="You don't have permission to view activity logs." className="py-6" />
+              </Card>
+            )}
+            <QuickActions can={can} />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-            <Panel
-              title="Recent projects"
-              icon={<FolderOpen />}
-              bodyClassName="p-0"
-              actions={
-                <Link href="/projects" className="text-xs font-medium text-cyan hover:underline">
-                  All projects
-                </Link>
-              }
-            >
-              {data.recentProjects.length === 0 ? (
-                <EmptyState
-                  title="No projects found"
-                  description="Create your first project to get started."
-                  action={can("projects.create") ? <ButtonLink href="/projects/new" size="sm">New project</ButtonLink> : undefined}
-                />
-              ) : (
-                <ul className="divide-y divide-line/60">
-                  {data.recentProjects.map((p) => (
-                    <li key={p.id}>
-                      <Link href={`/projects/${p.id}`} className="group grid gap-3 px-5 py-4 transition-colors hover:bg-panel-2 sm:grid-cols-[1fr_auto] sm:items-center">
-                        <div className="min-w-0 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="truncate text-sm font-medium text-ink group-hover:text-cyan">{p.name}</span>
-                            <ProjectStatusBadge status={p.status} />
-                          </div>
-                          <XpBar value={percent(p.taskStats.completed, p.taskStats.total)} label={`${p.name} progress`} />
-                        </div>
-                        <div className="flex items-center gap-4 sm:justify-end">
-                          <AvatarStack users={[p.manager, ...p.members]} />
-                          <span className="tabular text-xs text-ink-mute">
-                            {p.taskStats.completed}/{p.taskStats.total}
-                          </span>
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Panel>
-            <Panel
-              title="Recent activity"
-              icon={<Activity />}
-              actions={
-                can("activity_logs.view") && (
-                  <Link href="/activity" className="text-xs font-medium text-cyan hover:underline">
-                    View log
-                  </Link>
-                )
-              }
-            >
-              {!can("activity_logs.view") ? (
+          <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-12">
+            <RecentProjects projects={data.recentProjects} canCreate={can("projects.create")} />
+            <Card title="Recent Activity" icon={Activity} className="2xl:col-span-4" actions={canViewActivity && <ViewAll href="/activity" />}>
+              {!canViewActivity ? (
                 <EmptyState title="No access" description="You don't have permission to view activity logs." className="py-6" />
               ) : data.recentActivity.length === 0 ? (
                 <EmptyState title="No activity yet" description="Actions will appear here." className="py-6" />
               ) : (
-                <ActivityFeed items={data.recentActivity} />
+                <ActivityFeed items={data.recentActivity.slice(0, 5)} describeAction={actionLabel} />
               )}
-            </Panel>
+            </Card>
+            <StayProductive openTasks={data.myTasks.length} canViewTasks={can("tasks.view")} />
           </div>
         </>
       )}
@@ -183,19 +309,20 @@ export function DashboardView() {
 function DashboardSkeleton() {
   return (
     <div className="space-y-6" role="status" aria-label="Loading dashboard">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-32" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-32 rounded-2xl" />
         ))}
       </div>
-      <div className="grid gap-6 xl:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-72" />
-        ))}
+      <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-12">
+        <Skeleton className="h-80 rounded-2xl lg:col-span-2 2xl:col-span-5" />
+        <Skeleton className="h-80 rounded-2xl 2xl:col-span-4" />
+        <Skeleton className="h-80 rounded-2xl 2xl:col-span-3" />
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <Skeleton className="h-96" />
-        <Skeleton className="h-96" />
+      <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-12">
+        <Skeleton className="h-80 rounded-2xl lg:col-span-2 2xl:col-span-5" />
+        <Skeleton className="h-80 rounded-2xl 2xl:col-span-4" />
+        <Skeleton className="h-80 rounded-2xl 2xl:col-span-3" />
       </div>
     </div>
   );

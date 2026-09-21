@@ -21,6 +21,10 @@ const STATS: ActivityStats = {
     { entity: "task", count: 6 },
     { entity: "activity_log", count: 1 },
   ],
+  byAction: [
+    { action: "task.created", count: 6 },
+    { action: "activity_logs.exported", count: 1 },
+  ],
 };
 
 beforeEach(() => {

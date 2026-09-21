@@ -25,25 +25,23 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
       {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={onCloseMobile} aria-hidden="true" />}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-line bg-abyss transition-[width,transform] duration-200",
+          "fixed inset-y-0 left-0 z-50 flex flex-col bg-[linear-gradient(180deg,#141a3a_0%,#161d45_70%,#1c2358_100%)] text-white transition-[width,transform] duration-200",
           "w-72 -translate-x-full lg:translate-x-0",
           mobileOpen && "translate-x-0",
           collapsed ? "lg:w-[4.5rem]" : "lg:w-60",
         )}
         aria-label="Main navigation"
       >
-        <div className={cn("flex h-14 items-center border-b border-line px-4", collapsed && "lg:justify-center lg:px-0")}>
-          <Link href="/dashboard" onClick={onCloseMobile} aria-label="TimeFlow dashboard">
+        <div className={cn("flex h-16 items-center px-5", collapsed && "lg:justify-center lg:px-0")}>
+          <Link href="/dashboard" onClick={onCloseMobile} aria-label="TimeFlow dashboard" className="[&_span]:!text-white">
             <Logo compact={collapsed} />
           </Link>
-          <button onClick={onCloseMobile} className="ml-auto rounded-md p-2 text-ink-mute hover:bg-panel-3 hover:text-ink lg:hidden" aria-label="Close menu">
+          <button onClick={onCloseMobile} className="ml-auto rounded-md p-2 text-white/60 hover:bg-white/10 hover:text-white lg:hidden" aria-label="Close menu">
             <X className="size-5" />
           </button>
         </div>
 
-        <p className={cn("eyebrow px-6 pt-5 pb-2", collapsed && "lg:hidden")}>Workspace</p>
-
-        <nav className={cn("flex-1 space-y-0.5 overflow-y-auto px-3", collapsed && "lg:pt-4")}>
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 pt-4">
           {items.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
@@ -55,9 +53,9 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
                 aria-current={active ? "page" : undefined}
                 title={collapsed ? item.label : undefined}
                 className={cn(
-                  "flex h-9 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+                  "flex h-11 items-center gap-3 rounded-xl px-3.5 text-[0.9375rem] font-medium transition-colors",
                   collapsed && "lg:justify-center lg:px-0",
-                  active ? "bg-cyan/10 text-cyan" : "text-ink-dim hover:bg-panel-3 hover:text-ink",
+                  active ? "bg-cyan text-white shadow-lg shadow-cyan/30" : "text-white/70 hover:bg-white/[0.06] hover:text-white",
                 )}
               >
                 <Icon className="size-[18px] shrink-0" />
@@ -67,10 +65,10 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
           })}
         </nav>
 
-        <div className={cn("border-t border-line p-3", collapsed && "lg:px-2")}>
+        <div className={cn("border-t border-white/10 p-3", collapsed && "lg:px-2")}>
           <button
             onClick={onToggleCollapsed}
-            className="hidden h-9 w-full items-center justify-center gap-2 rounded-lg text-sm text-ink-mute transition hover:bg-panel-3 hover:text-ink lg:flex"
+            className="hidden h-9 w-full items-center justify-center gap-2 rounded-lg text-sm text-white/55 transition hover:bg-white/[0.06] hover:text-white lg:flex"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <ChevronsLeft className={cn("size-4 transition-transform", collapsed && "rotate-180")} />

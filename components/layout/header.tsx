@@ -7,7 +7,7 @@ import { UserMenu } from "./user-menu";
 
 export function Header({ onOpenMobile }: { onOpenMobile: () => void }) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-panel/85 px-4 backdrop-blur sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-line bg-panel/90 px-4 backdrop-blur sm:px-6 lg:px-8">
       <button
         onClick={onOpenMobile}
         className="flex size-9 items-center justify-center rounded-lg border border-line text-ink-dim hover:bg-panel-3 hover:text-ink lg:hidden"

@@ -46,7 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       />
       <div className={cn("flex min-h-dvh flex-col transition-[padding] duration-200", collapsed ? "lg:pl-[4.5rem]" : "lg:pl-60")}>
         <Header onOpenMobile={() => setMobileOpen(true)} />
-        <main id="main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main id="main" className="mx-auto w-full max-w-[1640px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}
         </main>
       </div>

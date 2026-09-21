@@ -149,6 +149,7 @@ export type ActivityStats = {
   total: number;
   days: { date: string; count: number }[];
   byEntity: { entity: string; count: number }[];
+  byAction: { action: string; count: number }[];
 };
 
 export type Notification = {
