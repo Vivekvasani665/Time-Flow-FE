@@ -5,15 +5,13 @@
  */
 
 export type Theme = "dark" | "light" | "system";
-export type Accent = "cyan" | "violet" | "magenta" | "lime" | "amber";
 export type Density = "comfortable" | "compact";
 
-export type Preferences = { theme: Theme; accent: Accent; density: Density };
+export type Preferences = { theme: Theme; density: Density };
 
-export const DEFAULT_PREFERENCES: Preferences = { theme: "light", accent: "cyan", density: "comfortable" };
+export const DEFAULT_PREFERENCES: Preferences = { theme: "light", density: "comfortable" };
 
 export const THEMES: Theme[] = ["light", "dark", "system"];
-export const ACCENTS: Accent[] = ["cyan", "violet", "magenta", "lime", "amber"];
 export const DENSITIES: Density[] = ["comfortable", "compact"];
 
 /** Matches the key convention already in use (tf.sidebar.collapsed, tf.sessionExpiresAt). */
@@ -21,9 +19,6 @@ export const PREFERENCES_KEY = "tf.preferences";
 
 function isTheme(v: unknown): v is Theme {
   return typeof v === "string" && (THEMES as string[]).includes(v);
-}
-function isAccent(v: unknown): v is Accent {
-  return typeof v === "string" && (ACCENTS as string[]).includes(v);
 }
 function isDensity(v: unknown): v is Density {
   return typeof v === "string" && (DENSITIES as string[]).includes(v);
@@ -34,7 +29,6 @@ export function normalise(value: unknown): Preferences {
   const v = (value ?? {}) as Partial<Record<keyof Preferences, unknown>>;
   return {
     theme: isTheme(v.theme) ? v.theme : DEFAULT_PREFERENCES.theme,
-    accent: isAccent(v.accent) ? v.accent : DEFAULT_PREFERENCES.accent,
     density: isDensity(v.density) ? v.density : DEFAULT_PREFERENCES.density,
   };
 }
@@ -67,11 +61,9 @@ export function resolveTheme(theme: Theme): "dark" | "light" {
   }
 }
 
-/** Stamps the three attributes the CSS in globals.css selects on. */
+/** Stamps the attributes the CSS in globals.css selects on. */
 export function applyPreferences(prefs: Preferences): void {
   const root = document.documentElement;
   root.dataset.theme = resolveTheme(prefs.theme);
-  // The accent picker was removed; always use the default so an old saved choice can't stick.
-  root.dataset.accent = DEFAULT_PREFERENCES.accent;
   root.dataset.density = prefs.density;
 }

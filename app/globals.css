@@ -106,20 +106,6 @@
     --shadow-dialog: 0 28px 72px -20px rgb(0 0 0 / 0.7);
   }
 
-  /* ── Accent ───────────────────────────────────────────────
-     Stored preference keys are kept; only the hues changed.
-     cyan → indigo (default), violet, magenta → rose, lime → emerald,
-     amber. */
-  :root[data-accent="violet"] { --color-cyan: #7c3aed; --color-cyan-deep: #6d28d9; }
-  :root[data-accent="magenta"] { --color-cyan: #e11d48; --color-cyan-deep: #be123c; }
-  :root[data-accent="lime"] { --color-cyan: #059669; --color-cyan-deep: #047857; }
-  :root[data-accent="amber"] { --color-cyan: #d97706; --color-cyan-deep: #b45309; }
-
-  :root[data-theme="dark"][data-accent="violet"] { --color-cyan: #a78bfa; --color-cyan-deep: #8b5cf6; }
-  :root[data-theme="dark"][data-accent="magenta"] { --color-cyan: #fb7185; --color-cyan-deep: #f43f5e; }
-  :root[data-theme="dark"][data-accent="lime"] { --color-cyan: #34d399; --color-cyan-deep: #10b981; }
-  :root[data-theme="dark"][data-accent="amber"] { --color-cyan: #fbbf24; --color-cyan-deep: #f59e0b; }
-
   :root[data-density="compact"] { --row-py: 0.375rem; }
 
   html {
