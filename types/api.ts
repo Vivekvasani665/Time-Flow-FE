@@ -142,6 +142,15 @@ export type ActivityLog = {
   createdAt: string;
 };
 
+export type ActivityStats = {
+  /** Inclusive UTC day range the counts cover (YYYY-MM-DD). */
+  from: string;
+  to: string;
+  total: number;
+  days: { date: string; count: number }[];
+  byEntity: { entity: string; count: number }[];
+};
+
 export type Notification = {
   id: string;
   type: string;

@@ -20,6 +20,7 @@ import { ENTITY_LABELS } from "@/lib/labels";
 import { cn, formatDateTime, fullName } from "@/lib/utils";
 import { activityService } from "@/services/activity.service";
 import type { ActivityListParams } from "@/types/api";
+import { ActivityChart } from "./activity-chart";
 import { EntityIcon } from "./activity-feed";
 
 const FILTERS = ["entity", "action", "userId", "from", "to"] as const;
@@ -79,6 +80,8 @@ export function ActivityList() {
       />
 
       <div className="hud-panel clip-corner">
+        <ActivityChart params={apiParams as ActivityListParams} onSelectDay={(date) => update({ from: date, to: date })} />
+
         <div className="space-y-3 border-b border-line p-4">
           <TableToolbar
             search={params.search}

@@ -30,6 +30,7 @@ export const queryKeys = {
   activity: {
     all: ["activity"] as const,
     list: (params: ActivityListParams) => ["activity", "list", params] as const,
+    stats: (params: ActivityListParams) => ["activity", "stats", params] as const,
   },
   notifications: ["notifications"] as const,
   sessions: ["auth", "sessions"] as const,
