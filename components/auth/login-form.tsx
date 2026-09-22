@@ -11,8 +11,9 @@ import { Field, fieldA11y } from "@/components/ui/field";
 import { Input, InputWithIcon } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { isApiError } from "@/lib/api/client";
-import { authService, type TwoFactorChallenge } from "@/services/auth.service";
+import { authService, type LoginOtpChallenge, type TwoFactorChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
+import { LoginOtpForm } from "./login-otp-form";
 
 export const loginSchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
@@ -46,10 +47,18 @@ function describeError(error: unknown): string {
       return "This account is deactivated. Contact an administrator.";
     case "RATE_LIMITED":
       return "Too many login attempts. Wait a minute and try again.";
+    case "EMAIL_DELIVERY_FAILED":
+      return "We couldn't send your verification code. Please try again in a moment.";
+    case "NETWORK_ERROR":
+      return "Unable to reach the server. Check your connection and try again.";
     default:
-      return error.message;
+      // Server faults stay generic; 4xx messages are written for users.
+      return error.status >= 500 ? "Something went wrong. Please try again later." : error.message;
   }
 }
+
+/** Which screen of the sign-in flow is showing, so the page can retitle itself. */
+export type LoginStep = "credentials" | "otp" | "two-factor";
 
 /** Second sign-in step for accounts with two-factor authentication. */
 function TwoFactorForm({
@@ -159,9 +168,10 @@ function TwoFactorForm({
   );
 }
 
-export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }) {
+export function LoginForm({ onSuccess, onStepChange }: { onSuccess: (user: AuthUser) => void; onStepChange?: (step: LoginStep) => void }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [challenge, setChallenge] = useState<TwoFactorChallenge | null>(null);
+  const [otpChallenge, setOtpChallenge] = useState<LoginOtpChallenge | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const {
     register,
@@ -175,26 +185,29 @@ export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }
     setFormError(null);
     try {
       const result = await authService.login(values);
-      if (result.twoFactorRequired) setChallenge({ challengeToken: result.challengeToken, challengeExpiresAt: result.challengeExpiresAt });
-      else onSuccess(result.user);
+      // Only the server decides whether a second step is needed.
+      if (result.requiresOtp) {
+        setOtpChallenge(result);
+        onStepChange?.("otp");
+      } else if (result.twoFactorRequired) {
+        setChallenge({ challengeToken: result.challengeToken, challengeExpiresAt: result.challengeExpiresAt });
+        onStepChange?.("two-factor");
+      } else onSuccess(result.user);
     } catch (error) {
       setFormError(describeError(error));
     }
   });
 
-  if (challenge) {
-    return (
-      <TwoFactorForm
-        challenge={challenge}
-        onSuccess={onSuccess}
-        onRestart={(reason) => {
-          setChallenge(null);
-          resetField("password");
-          setFormError(reason ?? null);
-        }}
-      />
-    );
-  }
+  const restart = (reason?: string) => {
+    setChallenge(null);
+    setOtpChallenge(null);
+    resetField("password");
+    setFormError(reason ?? null);
+    onStepChange?.("credentials");
+  };
+
+  if (otpChallenge) return <LoginOtpForm challenge={otpChallenge} onSuccess={onSuccess} onRestart={restart} />;
+  if (challenge) return <TwoFactorForm challenge={challenge} onSuccess={onSuccess} onRestart={restart} />;
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">

@@ -5,13 +5,13 @@ import { BarChart3, CalendarDays, Check, Mail, SquareCheckBig, Users } from "luc
 import { Caveat } from "next/font/google";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
 import { cn, fullName } from "@/lib/utils";
 import { authService } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
-import { LoginForm } from "./login-form";
+import { LoginForm, type LoginStep } from "./login-form";
 import { SignupForm } from "./signup-form";
 
 const handwriting = Caveat({ subsets: ["latin"], weight: ["500"], display: "swap" });
@@ -27,6 +27,8 @@ const COPY: Record<AuthMode, { title: string; subtitle: string; wave?: boolean }
   login: { title: "Welcome back", subtitle: "Enter your details to access your account.", wave: true },
   signup: { title: "Create your account", subtitle: "Sign up to start planning projects with your team." },
 };
+
+const OTP_COPY: (typeof COPY)[AuthMode] = { title: "Verify your login", subtitle: "We've sent a 6-digit verification code to your registered email." };
 
 const FEATURES = [
   { icon: Users, title: "Role-based access control", body: "Keep your team secure and organized.", tone: "text-blue bg-blue/10" },
@@ -144,6 +146,7 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
   const params = useSearchParams();
   const queryClient = useQueryClient();
   const next = safeNext(params.get("next"));
+  const [step, setStep] = useState<LoginStep>("credentials");
 
   // Already signed in (or refreshable)? Skip the login screen.
   useEffect(() => {
@@ -170,7 +173,7 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
     router.refresh();
   };
 
-  const copy = COPY[mode];
+  const copy = step === "otp" ? OTP_COPY : COPY[mode];
 
   return (
     <div className="grid min-h-dvh bg-void lg:grid-cols-[1.15fr_1fr]">
@@ -242,13 +245,13 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
         <div className="w-full max-w-[34rem]">
           <BrandMark className="mb-8 lg:hidden" />
           <div className="rounded-3xl border border-line bg-panel p-6 shadow-[0_20px_50px_-24px_rgb(49_46_129/0.25)] sm:p-10">
-            <AuthModeSwitch mode={mode} next={params.get("next")} />
+            {step === "credentials" && <AuthModeSwitch mode={mode} next={params.get("next")} />}
             <h1 className="flex items-center gap-2.5 text-3xl font-bold tracking-tight text-ink">
               {copy.wave && <span aria-hidden="true">👋</span>}
               {copy.title}
             </h1>
             <p className="mt-2 mb-8 text-ink-mute">{copy.subtitle}</p>
-            {mode === "signup" ? <SignupForm onSuccess={handleSuccess} /> : <LoginForm onSuccess={handleSuccess} />}
+            {mode === "signup" ? <SignupForm onSuccess={handleSuccess} /> : <LoginForm onSuccess={handleSuccess} onStepChange={setStep} />}
           </div>
         </div>
       </section>
