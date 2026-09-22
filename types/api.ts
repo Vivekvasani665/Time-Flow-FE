@@ -59,6 +59,7 @@ export type AuthUser = {
   role: RoleRef;
   permissions: string[];
   preferences: Preferences;
+  twoFactorEnabled: boolean;
   lastLoginAt: string | null;
   createdAt: string;
 };
