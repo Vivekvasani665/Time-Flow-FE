@@ -43,7 +43,7 @@ const FEATURES = [
   { icon: Mail, title: "Email notifications", body: "Get updates and never miss important changes.", tone: "text-violet bg-violet/10" },
 ] as const;
 
-function BrandMark({ className }: { className?: string }) {
+export function BrandMark({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-4", className)}>
       <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-cyan text-white shadow-lg shadow-cyan/25" aria-hidden="true">
