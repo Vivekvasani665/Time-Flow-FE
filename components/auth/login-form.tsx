@@ -10,7 +10,7 @@ import { Field, fieldA11y } from "@/components/ui/field";
 import { Input, InputWithIcon } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { isApiError } from "@/lib/api/client";
-import { authService } from "@/services/auth.service";
+import { authService, type LoginOtpChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
 
 export const loginSchema = z.object({
@@ -46,7 +46,18 @@ function describeError(error: unknown): string {
   }
 }
 
-export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }) {
+/**
+ * Step one. A correct password may sign the user straight in, or — with login
+ * OTP enabled on the API — only earn an emailed code, in which case the parent
+ * swaps in the code screen. Nothing is authenticated until one of those lands.
+ */
+export function LoginForm({
+  onSuccess,
+  onOtpRequired,
+}: {
+  onSuccess: (user: AuthUser) => void;
+  onOtpRequired: (challenge: LoginOtpChallenge) => void;
+}) {
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const {
@@ -60,6 +71,10 @@ export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }
     setFormError(null);
     try {
       const result = await authService.login(values);
+      if ("requiresOtp" in result) {
+        onOtpRequired(result);
+        return;
+      }
       if ("twoFactorRequired" in result) {
         // The API supports authenticator apps; this UI does not yet, so say so
         // rather than navigating to a dashboard with no session.

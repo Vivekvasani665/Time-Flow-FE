@@ -15,7 +15,7 @@ const login = vi.mocked(authService.login);
 describe("LoginForm", () => {
   it("shows validation errors and does not call the API when fields are empty", async () => {
     const user = userEvent.setup();
-    render(<LoginForm onSuccess={vi.fn()} />);
+    render(<LoginForm onSuccess={vi.fn()} onOtpRequired={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: /^sign in$/i }));
 
@@ -27,7 +27,7 @@ describe("LoginForm", () => {
 
   it("rejects a malformed email", async () => {
     const user = userEvent.setup();
-    render(<LoginForm onSuccess={vi.fn()} />);
+    render(<LoginForm onSuccess={vi.fn()} onOtpRequired={vi.fn()} />);
 
     await user.type(screen.getByLabelText(/email/i), "not-an-email");
     await user.type(screen.getByLabelText(/^password/i), "secret");
@@ -42,7 +42,7 @@ describe("LoginForm", () => {
     const onSuccess = vi.fn();
     const authUser = makeAuthUser();
     login.mockResolvedValueOnce({ signedIn: true, user: authUser });
-    render(<LoginForm onSuccess={onSuccess} />);
+    render(<LoginForm onSuccess={onSuccess} onOtpRequired={vi.fn()} />);
 
     await user.type(screen.getByLabelText(/email/i), "admin@timeflow.dev");
     await user.type(screen.getByLabelText(/^password/i), "Password123!");
@@ -56,7 +56,7 @@ describe("LoginForm", () => {
     const user = userEvent.setup();
     const onSuccess = vi.fn();
     login.mockRejectedValueOnce(new ApiError(401, "INVALID_CREDENTIALS", "Invalid email or password"));
-    render(<LoginForm onSuccess={onSuccess} />);
+    render(<LoginForm onSuccess={onSuccess} onOtpRequired={vi.fn()} />);
 
     await user.type(screen.getByLabelText(/email/i), "admin@timeflow.dev");
     await user.type(screen.getByLabelText(/^password/i), "wrong-pass1");
@@ -69,7 +69,7 @@ describe("LoginForm", () => {
   it("explains rate limiting", async () => {
     const user = userEvent.setup();
     login.mockRejectedValueOnce(new ApiError(429, "RATE_LIMITED", "Too many requests"));
-    render(<LoginForm onSuccess={vi.fn()} />);
+    render(<LoginForm onSuccess={vi.fn()} onOtpRequired={vi.fn()} />);
 
     await user.type(screen.getByLabelText(/email/i), "admin@timeflow.dev");
     await user.type(screen.getByLabelText(/^password/i), "Password123!");
@@ -80,7 +80,7 @@ describe("LoginForm", () => {
 
   it("fills credentials from a demo account chip", async () => {
     const user = userEvent.setup();
-    render(<LoginForm onSuccess={vi.fn()} />);
+    render(<LoginForm onSuccess={vi.fn()} onOtpRequired={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: /employee@timeflow\.dev/i }));
 
