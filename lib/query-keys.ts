@@ -10,6 +10,11 @@ export const queryKeys = {
     detail: (id: string) => ["users", "detail", id] as const,
     options: (search: string) => ["users", "options", search] as const,
   },
+  passwordResets: {
+    all: ["password-resets"] as const,
+    latest: (userIds: string[]) => ["password-resets", "latest", userIds] as const,
+    user: (userId: string) => ["password-resets", "user", userId] as const,
+  },
   roles: {
     all: ["roles"] as const,
     list: (params: ListParams) => ["roles", "list", params] as const,

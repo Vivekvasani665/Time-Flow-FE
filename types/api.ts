@@ -348,3 +348,17 @@ export type MailSettings = {
 
 export type MailSettingsInput = { username: string; password?: string; fromName: string; enabled?: boolean };
 export type MailTestResult = { ok: boolean; code?: string; message?: string };
+
+export type PasswordResetStatus = "PENDING" | "COMPLETED" | "EXPIRED" | "CANCELLED";
+
+/** An administrator-issued reset link, as the API reports it: status and times only, never the token or password. */
+export type PasswordResetRequest = {
+  id: string;
+  userId: string;
+  status: PasswordResetStatus;
+  createdAt: string;
+  expiresAt: string;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  requestedBy: UserRef | null;
+};
