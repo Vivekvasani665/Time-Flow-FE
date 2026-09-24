@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { describeError, isApiError } from "@/lib/api/client";
 import { applyServerErrors } from "@/lib/form-errors";
 import { authService, type SignupOtpChallenge } from "@/services/auth.service";
+import { deliveryFailureText } from "./signup-otp-form";
 
 const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,128}$/;
 
@@ -72,6 +73,11 @@ export function SignupForm({ onSuccess }: { onSuccess: (challenge: SignupOtpChal
     } catch (error) {
       if (!isApiError(error)) return setFormError(describeError(error).message);
       if (error.code === "RATE_LIMITED") return setFormError("Too many sign-up attempts. Wait a minute and try again.");
+      // Neither the email nor the SMS went out, so the API did not keep the account.
+      if (error.code === "OTP_DELIVERY_FAILED") {
+        const reasons = error.details.map((d) => deliveryFailureText(d.message)).join(" ");
+        return setFormError(`We couldn't send your verification code, so your account was not created. ${reasons} Please try again.`.replace(/\s+/g, " "));
+      }
       // Email already taken and validation details land on their fields; anything else is a toast.
       applyServerErrors(error, setError, FIELDS);
     }

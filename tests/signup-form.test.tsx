@@ -16,6 +16,7 @@ const challenge = {
   email: "s**@company.com",
   phone: "+91******3210",
   channels: ["email" as const, "sms" as const],
+  delivery: { email: { status: "sent" as const }, sms: { status: "sent" as const } },
   expiresAt: new Date(Date.now() + 300_000).toISOString(),
   resendAvailableAt: new Date(Date.now() + 30_000).toISOString(),
 };

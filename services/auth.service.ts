@@ -9,6 +9,13 @@ export type RegisterInput = { firstName: string; lastName: string; email: string
 export type OtpChannel = "email" | "sms";
 
 /**
+ * Per-channel outcome of the latest send. `code` is safe to show: EMAIL_SEND_FAILED,
+ * SMS_NOT_CONFIGURED, SMS_BLOCKED_IN_DEVELOPMENT, SMS_PROVIDER_AUTH_FAILED or SMS_SEND_FAILED.
+ */
+export type ChannelDelivery = { status: "sent" } | { status: "failed"; code: string };
+export type OtpDelivery = Partial<Record<OtpChannel, ChannelDelivery>>;
+
+/**
  * Signing up creates an unverified account and sends one code to both the email
  * and the mobile number. No session is issued — the account can sign in only
  * after the code is verified.
@@ -20,6 +27,8 @@ export type SignupOtpChallenge = {
   phone: string;
   /** Channels the current code actually reached. */
   channels: OtpChannel[];
+  /** Why a channel was not reached, when one was not. Only the channels just sent to are present. */
+  delivery: OtpDelivery;
   /** Local deadlines, derived from the API's relative seconds so a skewed clock still counts down correctly. */
   expiresAt: string;
   resendAvailableAt: string;
@@ -32,11 +41,12 @@ type SignupOtpResponse = Omit<SignupOtpChallenge, "expiresAt" | "resendAvailable
 
 const inSeconds = (seconds: number) => new Date(Date.now() + seconds * 1000).toISOString();
 
-const toSignupChallenge = ({ verificationId, email, phone, channels, expiresInSeconds, resendAvailableInSeconds }: SignupOtpResponse): SignupOtpChallenge => ({
+const toSignupChallenge = ({ verificationId, email, phone, channels, delivery, expiresInSeconds, resendAvailableInSeconds }: SignupOtpResponse): SignupOtpChallenge => ({
   verificationId,
   email,
   phone,
   channels,
+  delivery: delivery ?? {},
   expiresAt: inSeconds(expiresInSeconds),
   resendAvailableAt: inSeconds(resendAvailableInSeconds),
 });
