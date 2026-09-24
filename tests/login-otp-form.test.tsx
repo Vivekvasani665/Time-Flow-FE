@@ -35,9 +35,59 @@ const renderForm = (challenge = makeChallenge(), props: { onSuccess?: () => void
 };
 
 describe("LoginOtpForm", () => {
-  it("tells the user which mailbox to check without revealing the address", () => {
+  it("with an email-only challenge, shows just the masked mailbox", () => {
     renderForm();
-    expect(screen.getByText("v****@gmail.com")).toBeInTheDocument();
+    expect(screen.getByText("Sent to v****@gmail.com")).toBeInTheDocument();
+    expect(screen.queryByText(/^SMS$/)).not.toBeInTheDocument();
+  });
+
+  it("shows both masked destinations and says the same code went to each", () => {
+    renderForm(
+      makeChallenge({
+        phone: "+91******3210",
+        channels: ["email", "sms"],
+        delivery: { email: { status: "sent" }, sms: { status: "sent" } },
+        emailSent: true,
+        smsSent: true,
+      }),
+    );
+    expect(screen.getByText("Sent to v****@gmail.com")).toBeInTheDocument();
+    expect(screen.getByText("Sent to +91******3210")).toBeInTheDocument();
+    expect(screen.getByText(/same code in both/i)).toBeInTheDocument();
+    // One code, so one input.
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+  });
+
+  it("explains an SMS that could not be sent while the email code still works", () => {
+    renderForm(
+      makeChallenge({
+        phone: "+91******3210",
+        channels: ["email"],
+        delivery: { email: { status: "sent" }, sms: { status: "failed", code: "SMS_PROVIDER_UNAVAILABLE" } },
+        emailSent: true,
+        smsSent: false,
+      }),
+    );
+    expect(screen.getByText(/SMS service is unavailable/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/couldn't send the SMS verification code/i);
+    expect(screen.queryByText(/same code in both/i)).not.toBeInTheDocument();
+  });
+
+  it("names each failed channel when no code could be sent on resend", async () => {
+    const user = userEvent.setup();
+    resend.mockRejectedValueOnce(
+      new ApiError(503, "OTP_DELIVERY_FAILED", "We could not send your verification code.", [
+        { path: "email", message: "EMAIL_DELIVERY_FAILED" },
+        { path: "sms", message: "SMS_DELIVERY_FAILED" },
+      ]),
+    );
+    renderForm(makeChallenge({ resendAvailableAt: new Date(Date.now() - 1000).toISOString() }));
+
+    await user.click(screen.getByRole("button", { name: /^resend code$/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/email verification code could not be sent/i);
+    expect(alert).toHaveTextContent(/SMS verification code could not be sent/i);
   });
 
   it("verifies as soon as the sixth digit is typed", async () => {
@@ -89,7 +139,7 @@ describe("LoginOtpForm", () => {
 
   it("holds the resend button until the cooldown has elapsed", () => {
     renderForm();
-    expect(screen.getByRole("button", { name: /resend in/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /resend code in/i })).toBeDisabled();
     expect(resend).not.toHaveBeenCalled();
   });
 
@@ -100,12 +150,12 @@ describe("LoginOtpForm", () => {
     // Cooldown already elapsed, so the button is live.
     const { code } = renderForm(makeChallenge({ resendAvailableAt: new Date(Date.now() - 1000).toISOString() }));
 
-    await user.click(screen.getByRole("button", { name: /send a new code/i }));
+    await user.click(screen.getByRole("button", { name: /^resend code$/i }));
 
     await waitFor(() => expect(resend).toHaveBeenCalledWith("11111111-1111-4111-8111-111111111111"));
-    expect(await screen.findByRole("status")).toHaveTextContent(/new code is on its way/i);
+    expect(await screen.findByRole("status")).toHaveTextContent(/new code was sent to your email\./i);
     // The new challenge's cooldown applies from here.
-    expect(screen.getByRole("button", { name: /resend in/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /resend code in/i })).toBeDisabled();
     expect(code()).toHaveValue("");
   });
 
@@ -114,7 +164,7 @@ describe("LoginOtpForm", () => {
     resend.mockRejectedValueOnce(new ApiError(429, "LOGIN_OTP_RESEND_LIMIT", "Too many codes requested. Please sign in again."));
     renderForm(makeChallenge({ resendAvailableAt: new Date(Date.now() - 1000).toISOString() }));
 
-    await user.click(screen.getByRole("button", { name: /send a new code/i }));
+    await user.click(screen.getByRole("button", { name: /^resend code$/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/too many codes requested/i);
   });

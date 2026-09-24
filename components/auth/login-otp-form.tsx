@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, ArrowRight, MailCheck, RotateCcw } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, fieldA11y } from "@/components/ui/field";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { describeError as friendlyError, isApiError } from "@/lib/api/client";
 import { authService, type LoginOtpChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
+import { channelPhrase, deliveryFailureReasons, OtpDestinations, reachedChannels } from "./otp-destinations";
 
 const OTP_LENGTH = 6;
 
@@ -18,9 +19,9 @@ function describeError(error: unknown): string {
   if (!isApiError(error)) return friendlyError(error).message;
   switch (error.code) {
     // Signing in again replaces the previous code, so a rejected code is most
-    // often a correct one read out of an older email.
+    // often a correct one read out of an older message.
     case "LOGIN_OTP_INVALID":
-      return `${error.message} Use the code from the newest email — earlier ones stop working.`;
+      return `${error.message} Use the code from the newest email or SMS — earlier ones stop working.`;
     // The API counts down the remaining attempts in its own message, so it is
     // more informative here than anything we could write.
     case "LOGIN_OTP_TOO_MANY_ATTEMPTS":
@@ -31,14 +32,18 @@ function describeError(error: unknown): string {
       return "That code has expired. Request a new one below.";
     case "LOGIN_OTP_SESSION_INVALID":
       return "This sign-in attempt is no longer valid. Go back and sign in again.";
+    // Neither channel got the code; `details` names each failure when the API lists them.
     case "EMAIL_DELIVERY_FAILED":
-      return "We could not send the email just now. Try again in a moment.";
+    case "OTP_DELIVERY_FAILED": {
+      const reasons = deliveryFailureReasons(error.details);
+      return reasons ? `${reasons} Try again in a moment.` : "We could not send the verification code just now. Try again in a moment.";
+    }
     case "ACCOUNT_INACTIVE":
       return "This account is deactivated. Contact an administrator.";
     case "RATE_LIMITED":
       return "Too many attempts. Wait a minute and try again.";
     case "VALIDATION_ERROR":
-      return "Enter the 6-digit code from your email.";
+      return "Enter the 6-digit verification code.";
     default:
       return error.message;
   }
@@ -73,8 +78,9 @@ export function useCountdown(deadline: string): number {
 }
 
 /**
- * Step two of signing in: the password was accepted and a code was emailed, but
- * no session exists until that code is verified here.
+ * Step two of signing in: the password was accepted and one code went to the email
+ * and, when the account has a mobile number, by SMS. No session exists until that
+ * code is verified here.
  */
 export function LoginOtpForm({
   challenge: initialChallenge,
@@ -120,7 +126,7 @@ export function LoginOtpForm({
   const onSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!isComplete(code)) {
-      setFormError("Enter the 6-digit code from your email.");
+      setFormError("Enter the 6-digit verification code.");
       return;
     }
     void verify(code);
@@ -134,7 +140,7 @@ export function LoginOtpForm({
       const next = await authService.resendLoginOtp(challenge.verificationId);
       setChallenge(next);
       setCode("");
-      setNotice(`A new code is on its way to ${next.email}.`);
+      setNotice(`A new code was sent to ${channelPhrase(reachedChannels(next.channels, next.delivery))}. Earlier codes no longer work.`);
       inputRef.current?.focus();
     } catch (error) {
       setFormError(describeError(error));
@@ -150,14 +156,27 @@ export function LoginOtpForm({
     if (digits.length === OTP_LENGTH && !verifying && !expired) void verify(digits);
   };
 
+  const reached = reachedChannels(challenge.channels, challenge.delivery);
+  const bothReached = reached.length === 2;
+  const smsFailed = challenge.delivery?.sms?.status === "failed";
+  const emailFailed = challenge.delivery?.email?.status === "failed";
+
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
-      <div className="flex items-start gap-3 rounded-lg border border-cyan/30 bg-cyan/10 px-3.5 py-3 text-sm text-ink-dim">
-        <MailCheck className="mt-0.5 size-4 shrink-0 text-cyan" aria-hidden="true" />
-        <p>
-          We sent a {OTP_LENGTH}-digit code to <span className="font-medium text-ink">{challenge.email}</span>. Enter it below to finish signing in.
-        </p>
+      <div className="space-y-3">
+        <p className="text-sm text-ink-dim">We sent a {OTP_LENGTH}-digit verification code to:</p>
+        <OtpDestinations email={challenge.email} phone={challenge.phone} channels={challenge.channels} delivery={challenge.delivery} />
+        {bothReached && <p className="text-xs text-ink-mute">It&apos;s the same code in both — use whichever arrives first.</p>}
       </div>
+
+      {(smsFailed || emailFailed) && reached.length > 0 && (
+        <p role="status" className="flex items-start gap-3 rounded-lg border border-amber/30 bg-amber/10 px-3.5 py-3 text-sm text-ink">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber" aria-hidden="true" />
+          {smsFailed
+            ? "We couldn't send the SMS verification code. Use the code from your email, or resend the code."
+            : "We couldn't send the email verification code. Use the code from your SMS, or resend the code."}
+        </p>
+      )}
 
       {formError && (
         <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger/10 px-3.5 py-3 text-sm text-danger">
@@ -202,22 +221,26 @@ export function LoginOtpForm({
       </Button>
 
       <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
-        <Button
-          variant="secondary"
-          onClick={onResend}
-          loading={resending}
-          disabled={resendIn > 0}
-          icon={<RotateCcw className="size-4" aria-hidden="true" />}
-        >
-          {resendIn > 0 ? `Resend in ${formatDuration(resendIn)}` : "Send a new code"}
-        </Button>
+        <p className="flex flex-wrap items-center gap-2 text-sm text-ink-mute">
+          Didn&apos;t receive the code?
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onResend}
+            loading={resending}
+            disabled={resendIn > 0 || resending}
+            icon={<RotateCcw className="size-3.5" aria-hidden="true" />}
+          >
+            {resending ? "Sending…" : resendIn > 0 ? `Resend code in ${formatDuration(resendIn)}` : "Resend code"}
+          </Button>
+        </p>
         <Button variant="ghost" onClick={onCancel} icon={<ArrowLeft className="size-4" aria-hidden="true" />}>
           Use a different account
         </Button>
       </div>
 
       <p className="text-center text-xs text-ink-mute">
-        The code only works once. Check your spam folder if it has not arrived within a minute.
+        The code only works once. If it has not arrived within a minute, check your spam folder or SMS inbox.
       </p>
     </form>
   );

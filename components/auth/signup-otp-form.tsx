@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, CheckCircle2, Mail, RotateCcw, Smartphone } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Field, fieldA11y } from "@/components/ui/field";
@@ -9,30 +9,13 @@ import { describeError as friendlyError, isApiError } from "@/lib/api/client";
 import { authService, type OtpChannel, type SignupOtpChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
 import { formatDuration, useCountdown } from "./login-otp-form";
+import { deliveryFailureText, OtpDestinations } from "./otp-destinations";
 
 const OTP_LENGTH = 6;
 
 const isComplete = (code: string) => new RegExp(`^\\d{${OTP_LENGTH}}$`).test(code);
 
 const CHANNEL_NAME: Record<OtpChannel, string> = { email: "email", sms: "SMS" };
-
-/** Safe, user-facing reason for a channel the API could not reach. Provider details stay in the server log. */
-export function deliveryFailureText(code: string): string {
-  switch (code) {
-    case "SMS_NOT_CONFIGURED":
-      return "SMS verification code could not be sent — SMS is not set up on the server yet.";
-    case "SMS_BLOCKED_IN_DEVELOPMENT":
-      return "SMS verification code could not be sent — real SMS is switched off in this environment.";
-    case "SMS_PROVIDER_AUTH_FAILED":
-      return "SMS verification code could not be sent — SMS provider authentication failed.";
-    case "SMS_SEND_FAILED":
-      return "SMS verification code could not be sent.";
-    case "EMAIL_SEND_FAILED":
-      return "Email verification code could not be sent.";
-    default:
-      return "The code could not be sent.";
-  }
-}
 
 function describeError(error: unknown): string {
   if (!isApiError(error)) return friendlyError(error).message;
@@ -139,40 +122,12 @@ export function SignupOtpForm({
     if (digits.length === OTP_LENGTH && !verifying && !expired) void verify(digits);
   };
 
-  const destinations = [
-    { channel: "email" as const, icon: Mail, label: "Email", value: challenge.email },
-    { channel: "sms" as const, icon: Smartphone, label: "SMS", value: challenge.phone },
-  ];
-
-  /** What each card says about the newest code. A channel left out of the last resend did not get it. */
-  const statusOf = (channel: OtpChannel, value: string) => {
-    const outcome = challenge.delivery[channel];
-    if (outcome?.status === "failed") return { ok: false, text: deliveryFailureText(outcome.code) };
-    if (outcome?.status === "sent" || (!outcome && Object.keys(challenge.delivery).length === 0 && challenge.channels.includes(channel))) {
-      return { ok: true, text: `Sent to ${value}` };
-    }
-    return { ok: false, text: "Newest code not sent here" };
-  };
-
   const smsFailed = challenge.delivery.sms?.status === "failed" && challenge.channels.includes("email");
   const emailFailed = challenge.delivery.email?.status === "failed" && challenge.channels.includes("sms");
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {destinations.map(({ channel, icon: Icon, label, value }) => {
-          const status = statusOf(channel, value);
-          return (
-            <li key={channel} className="flex items-center gap-3 rounded-lg border border-line bg-panel-2 px-3.5 py-3 text-sm">
-              <Icon className={status.ok ? "size-4 shrink-0 text-cyan" : "size-4 shrink-0 text-danger"} aria-hidden="true" />
-              <span className="min-w-0">
-                <span className="block font-medium text-ink">{label} OTP</span>
-                <span className={status.ok ? "block text-xs text-ink-mute" : "block text-xs text-danger"}>{status.text}</span>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+      <OtpDestinations email={challenge.email} phone={challenge.phone} channels={challenge.channels} delivery={challenge.delivery} labelSuffix=" OTP" />
 
       {(smsFailed || emailFailed) && (
         <p role="status" className="flex items-start gap-3 rounded-lg border border-amber/30 bg-amber/10 px-3.5 py-3 text-sm text-ink">

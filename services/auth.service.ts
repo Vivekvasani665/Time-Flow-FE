@@ -9,8 +9,9 @@ export type RegisterInput = { firstName: string; lastName: string; email: string
 export type OtpChannel = "email" | "sms";
 
 /**
- * Per-channel outcome of the latest send. `code` is safe to show: EMAIL_SEND_FAILED,
- * SMS_NOT_CONFIGURED, SMS_BLOCKED_IN_DEVELOPMENT, SMS_PROVIDER_AUTH_FAILED or SMS_SEND_FAILED.
+ * Per-channel outcome of the latest send. `code` is safe to show: EMAIL_DELIVERY_FAILED,
+ * INVALID_PHONE_NUMBER, SMS_NOT_CONFIGURED, SMS_BLOCKED_IN_DEVELOPMENT, SMS_PROVIDER_AUTH_FAILED,
+ * SMS_PROVIDER_UNAVAILABLE or SMS_DELIVERY_FAILED.
  */
 export type ChannelDelivery = { status: "sent" } | { status: "failed"; code: string };
 export type OtpDelivery = Partial<Record<OtpChannel, ChannelDelivery>>;
@@ -54,7 +55,8 @@ const toSignupChallenge = ({ verificationId, email, phone, channels, delivery, e
 /**
  * A correct password does not always mean a session. With login OTP enabled the
  * API answers 200 with this instead and sets no cookies — the session is issued
- * only once the emailed code comes back.
+ * only once the code comes back. One code goes to the email and, when the account
+ * has a mobile number, the same code by SMS.
  */
 export type LoginOtpChallenge = {
   requiresOtp: true;
@@ -62,6 +64,14 @@ export type LoginOtpChallenge = {
   verificationId: string;
   /** Masked, e.g. `v****@gmail.com` — safe to display. */
   email: string;
+  /** Masked, e.g. `+91******3210`. Null when the account has no mobile number (email only). */
+  phone?: string | null;
+  /** Channels the current code reached. Absent from an email-only API, which means email. */
+  channels?: OtpChannel[];
+  /** Why a channel was not reached, when one was not. */
+  delivery?: OtpDelivery;
+  emailSent?: boolean;
+  smsSent?: boolean;
   expiresAt: string;
   resendAvailableAt: string;
   /** Relative twins of the dates above, so a client with a skewed clock still counts down correctly. */

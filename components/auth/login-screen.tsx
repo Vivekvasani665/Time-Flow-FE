@@ -41,8 +41,8 @@ const SIGNUP_OTP_COPY: Copy = {
 
 /** Shown in place of the sign-in copy while a password-verified login waits for its code. */
 const OTP_COPY: Copy = {
-  title: "Check your email",
-  subtitle: "Your password was accepted. Enter the code we just sent to finish signing in.",
+  title: "Verify your account",
+  subtitle: "Your password was accepted. Enter the verification code we just sent to finish signing in.",
 };
 
 const FEATURES = [
