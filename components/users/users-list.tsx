@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, KeyRound, Pencil, Power, Trash2, UserPlus } from "lucide-react";
+import { Eye, KeyRound, MailPlus, Pencil, Power, Trash2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -127,11 +127,18 @@ export function UsersList() {
         title="Users"
         description="Manage team members, their roles and account status."
         actions={
-          <Can permission="users.create">
-            <ButtonLink href="/users/new" icon={<UserPlus className="size-4" />}>
-              New user
-            </ButtonLink>
-          </Can>
+          <>
+            {superAdmin && (
+              <ButtonLink href="/users/invite" variant="secondary" icon={<MailPlus className="size-4" />}>
+                Invite user
+              </ButtonLink>
+            )}
+            <Can permission="users.create">
+              <ButtonLink href="/users/new" icon={<UserPlus className="size-4" />}>
+                New user
+              </ButtonLink>
+            </Can>
+          </>
         }
       />
 

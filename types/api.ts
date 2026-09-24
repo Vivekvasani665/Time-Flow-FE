@@ -362,3 +362,24 @@ export type PasswordResetRequest = {
   cancelledAt: string | null;
   requestedBy: UserRef | null;
 };
+
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+
+/** A Super Admin's invitation as the API reports it: never the token. */
+export type Invitation = {
+  id: string;
+  email: string;
+  status: InvitationStatus;
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+  role: { id: string; name: string };
+  invitedBy: UserRef | null;
+  acceptedUser: UserRef | null;
+};
+
+/** The raw link is returned only once, when the invitation is generated. */
+export type CreatedInvitation = { invitation: Invitation; inviteUrl: string };
+
+export type InvitationCheck = { valid: true; email: string; role: { id: string; name: string }; expiresAt: string };

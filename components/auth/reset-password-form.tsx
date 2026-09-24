@@ -45,7 +45,7 @@ const problemOf = (error: unknown): LinkProblem | null => {
   return null;
 };
 
-function StatusCard({ icon, tone, title, children, action }: { icon: ReactNode; tone: "lime" | "danger" | "amber"; title: string; children: ReactNode; action: ReactNode }) {
+export function StatusCard({ icon, tone, title, children, action }: { icon: ReactNode; tone: "lime" | "danger" | "amber"; title: string; children: ReactNode; action: ReactNode }) {
   const toneClass = { lime: "bg-lime/10 text-lime", danger: "bg-danger/10 text-danger", amber: "bg-amber/10 text-amber" }[tone];
   return (
     <div className="text-center" role="status">
@@ -59,7 +59,7 @@ function StatusCard({ icon, tone, title, children, action }: { icon: ReactNode; 
   );
 }
 
-function PasswordInput({ id, label, error, registration, autoFocus }: { id: string; label: string; error?: string; registration: UseFormRegisterReturn; autoFocus?: boolean }) {
+export function PasswordInput({ id, label, error, registration, autoFocus }: { id: string; label: string; error?: string; registration: UseFormRegisterReturn; autoFocus?: boolean }) {
   const [visible, setVisible] = useState(false);
   return (
     <Field label={label} htmlFor={id} error={error} required>
@@ -84,6 +84,29 @@ function PasswordInput({ id, label, error, registration, autoFocus }: { id: stri
         </button>
       </div>
     </Field>
+  );
+}
+
+/** Live checklist of PASSWORD_REQUIREMENTS for the password being typed. */
+export function PasswordRequirements({ value }: { value: string | undefined }) {
+  return (
+    <div className="rounded-xl border border-line bg-panel-2 px-4 py-3.5">
+      <p className="text-sm font-medium text-ink" id="password-requirements">
+        Password requirements:
+      </p>
+      <ul className="mt-2 grid gap-1.5 text-sm sm:grid-cols-2" aria-labelledby="password-requirements">
+        {PASSWORD_REQUIREMENTS.map((r) => {
+          const met = r.test(value ?? "");
+          return (
+            <li key={r.label} className={cn("flex items-center gap-2 transition-colors", met ? "text-lime" : "text-ink-mute")}>
+              <Check className={cn("size-4 shrink-0", !met && "opacity-30")} aria-hidden="true" />
+              {r.label}
+              <span className="sr-only">{met ? "(met)" : "(not met)"}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -200,23 +223,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         <PasswordInput id="newPassword" label="New Password" error={errors.newPassword?.message} registration={register("newPassword")} autoFocus />
         <PasswordInput id="confirmPassword" label="Confirm Password" error={errors.confirmPassword?.message} registration={register("confirmPassword")} />
 
-        <div className="rounded-xl border border-line bg-panel-2 px-4 py-3.5">
-          <p className="text-sm font-medium text-ink" id="password-requirements">
-            Password requirements:
-          </p>
-          <ul className="mt-2 grid gap-1.5 text-sm sm:grid-cols-2" aria-labelledby="password-requirements">
-            {PASSWORD_REQUIREMENTS.map((r) => {
-              const met = r.test(newPassword ?? "");
-              return (
-                <li key={r.label} className={cn("flex items-center gap-2 transition-colors", met ? "text-lime" : "text-ink-mute")}>
-                  <Check className={cn("size-4 shrink-0", !met && "opacity-30")} aria-hidden="true" />
-                  {r.label}
-                  <span className="sr-only">{met ? "(met)" : "(not met)"}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        <PasswordRequirements value={newPassword} />
 
         <Button type="submit" size="lg" className="h-12 w-full rounded-xl text-base" loading={isSubmitting}>
           {isSubmitting ? "Resetting password…" : "Reset Password"}
