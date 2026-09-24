@@ -14,10 +14,10 @@ import { DataRow, Panel } from "@/components/ui/panel";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/states";
 import { useDeleteTask, useTask } from "@/hooks/use-tasks";
-import { isApiError } from "@/lib/api/client";
 import { cn, formatDate, formatDateTime, fullName, isOverdue } from "@/lib/utils";
 import { StatusSwitcher } from "./status-switcher";
 import { useCanFullyEditTask } from "./task-editor";
+import { notifyError } from "@/lib/notify";
 
 export function TaskDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -29,7 +29,7 @@ export function TaskDetail({ id }: { id: string }) {
   const { canFullEdit } = useCanFullyEditTask(query.data?.project.id);
 
   if (query.isLoading) return <PageSkeleton />;
-  if (query.error || !query.data) return <ErrorState title="Task unavailable" message={query.error?.message} onRetry={() => void query.refetch()} />;
+  if (query.error || !query.data) return <ErrorState title="Task unavailable" error={query.error} onRetry={() => query.refetch()} />;
 
   const t = query.data;
   const overdue = isOverdue(t.dueDate, t.status);
@@ -41,7 +41,7 @@ export function TaskDetail({ id }: { id: string }) {
       toast.success("Task deleted", { description: t.title });
       router.push("/tasks");
     } catch (error) {
-      toast.error("Delete failed", { description: isApiError(error) ? error.message : "Try again." });
+      notifyError(error, { title: "Delete failed" });
       setConfirm(false);
     }
   };

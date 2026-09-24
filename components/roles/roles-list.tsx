@@ -16,9 +16,9 @@ import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdow
 import { PageHeader } from "@/components/ui/page-header";
 import { useDeleteRole, usePermissionCatalog, useRoles } from "@/hooks/use-roles";
 import { useTableParams } from "@/hooks/use-table-params";
-import { isApiError } from "@/lib/api/client";
 import { formatDate } from "@/lib/utils";
 import type { Role } from "@/types/api";
+import { notifyError } from "@/lib/notify";
 
 export function RolesList() {
   const { can } = usePermissions();
@@ -75,7 +75,7 @@ export function RolesList() {
       toast.success("Role deleted", { description: pending.name });
       setPending(null);
     } catch (error) {
-      toast.error("Cannot delete role", { description: isApiError(error) ? error.message : "Try again." });
+      notifyError(error, { title: "Cannot delete role" });
     }
   };
 

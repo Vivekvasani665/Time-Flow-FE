@@ -1,12 +1,13 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { BarChart3, CalendarDays, Check, Mail, SquareCheckBig, Users } from "lucide-react";
+import { BarChart3, CalendarDays, Check, Clock, Mail, SquareCheckBig, Users } from "lucide-react";
 import { Caveat } from "next/font/google";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { SESSION_EXPIRED_REASON } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query-keys";
 import { cn, fullName } from "@/lib/utils";
 import { authService, type LoginOtpChallenge } from "@/services/auth.service";
@@ -262,6 +263,14 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
               {copy.title}
             </h1>
             <p className="mt-2 mb-8 text-ink-mute">{copy.subtitle}</p>
+            {mode === "login" && !awaitingOtp && params.get("reason") === SESSION_EXPIRED_REASON && (
+              <div role="status" className="mb-6 flex items-start gap-3 rounded-lg border border-amber/30 bg-amber/10 px-3.5 py-3 text-sm text-ink animate-fade-up">
+                <Clock className="mt-0.5 size-4 shrink-0 text-amber" aria-hidden="true" />
+                <span>
+                  <span className="font-semibold">Session Expired.</span> Your session has expired. Please sign in again to continue.
+                </span>
+              </div>
+            )}
             {mode === "signup" ? (
               <SignupForm onSuccess={handleSuccess} />
             ) : awaitingOtp ? (

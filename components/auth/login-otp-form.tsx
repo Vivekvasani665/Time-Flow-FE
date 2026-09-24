@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, fieldA11y } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { isApiError } from "@/lib/api/client";
+import { describeError as friendlyError, isApiError } from "@/lib/api/client";
 import { authService, type LoginOtpChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
 
@@ -15,7 +15,7 @@ const OTP_LENGTH = 6;
 const isComplete = (code: string) => new RegExp(`^\\d{${OTP_LENGTH}}$`).test(code);
 
 function describeError(error: unknown): string {
-  if (!isApiError(error)) return "Unable to reach the server. Try again.";
+  if (!isApiError(error)) return friendlyError(error).message;
   switch (error.code) {
     // Signing in again replaces the previous code, so a rejected code is most
     // often a correct one read out of an older email.

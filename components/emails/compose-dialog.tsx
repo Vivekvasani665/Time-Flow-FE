@@ -10,7 +10,7 @@ import { Field } from "@/components/ui/field";
 import { Input, Textarea } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSendEmail } from "@/hooks/use-emails";
-import { isApiError } from "@/lib/api/client";
+import { notifyError } from "@/lib/notify";
 
 type Errors = Partial<Record<"toUserId" | "toEmail" | "subject" | "body", string>>;
 
@@ -111,7 +111,7 @@ export function ComposeDialog({
           });
           close();
         },
-        onError: (e) => toast.error("Could not send", { description: isApiError(e) ? e.message : "Try again." }),
+        onError: (e) => notifyError(e, { title: "Could not send" }),
       },
     );
   };

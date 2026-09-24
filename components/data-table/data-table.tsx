@@ -69,7 +69,7 @@ export function DataTable<T>({
   const secondary = columns.filter((c) => c !== primary && !c.hideOnMobile);
 
   const body = error && rows.length === 0 ? (
-    <ErrorState message={error.message} onRetry={onRetry} />
+    <ErrorState error={error} onRetry={onRetry} />
   ) : !showSkeleton && rows.length === 0 ? (
     <EmptyState {...empty} />
   ) : null;

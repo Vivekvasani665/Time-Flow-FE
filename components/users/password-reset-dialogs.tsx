@@ -11,6 +11,7 @@ import { usePasswordResetStatus, useSendPasswordReset } from "@/hooks/use-passwo
 import { isApiError } from "@/lib/api/client";
 import { formatDateTime, fullName } from "@/lib/utils";
 import type { PasswordResetRequest, PasswordResetStatus } from "@/types/api";
+import { notifyError } from "@/lib/notify";
 
 type Member = { id: string; firstName: string; lastName: string; email: string };
 
@@ -41,7 +42,7 @@ export function SendPasswordResetDialog({
       toast.success("Password reset link sent successfully.", { description: `Sent to ${member.email}.` });
       onOpenChange(false);
     } catch (error) {
-      toast.error("Unable to send password reset email.", { description: isApiError(error) ? error.message : "Try again." });
+      notifyError(error, { title: "Unable to send password reset email." });
     }
   };
 

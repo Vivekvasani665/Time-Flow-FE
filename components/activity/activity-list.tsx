@@ -136,7 +136,7 @@ export function ActivityList() {
             ))}
           </div>
         ) : query.error && logs.length === 0 ? (
-          <ErrorState message={query.error.message} onRetry={() => void query.refetch()} />
+          <ErrorState error={query.error} onRetry={() => query.refetch()} />
         ) : logs.length === 0 ? (
           <EmptyState
             title={hasFilters ? "No activity matches" : "No activity yet"}

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Field, fieldA11y } from "@/components/ui/field";
 import { Input, InputWithIcon } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { isApiError } from "@/lib/api/client";
+import { describeError as friendlyError, isApiError } from "@/lib/api/client";
 import { authService, type LoginOtpChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
 
@@ -33,7 +33,7 @@ export const DEMO_PASSWORD = "Password123!";
 const SHOW_DEMO_ACCOUNTS = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === "true";
 
 function describeError(error: unknown): string {
-  if (!isApiError(error)) return "Unable to reach the server. Try again.";
+  if (!isApiError(error)) return friendlyError(error).message;
   switch (error.code) {
     case "INVALID_CREDENTIALS":
       return "Invalid email or password.";

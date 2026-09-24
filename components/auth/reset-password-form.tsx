@@ -10,7 +10,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Field, fieldA11y } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { isApiError } from "@/lib/api/client";
+import { describeError, isApiError } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { passwordResetService } from "@/services/password-reset.service";
 
@@ -142,7 +142,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
     } catch (error) {
       const problem = problemOf(error);
       if (problem) return setLinkProblem(problem);
-      if (!isApiError(error)) return setFormError("Unable to reach the server. Try again.");
+      if (!isApiError(error)) return setFormError(describeError(error).message);
       if (error.code === "RATE_LIMITED") return setFormError("Too many attempts. Wait a few minutes and try again.");
       const fieldErrors = error.details.filter((d) => d.path === "newPassword" || d.path === "confirmPassword");
       for (const d of fieldErrors) setError(d.path as keyof ResetPasswordValues, { type: "server", message: d.message });
@@ -174,7 +174,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <StatusCard
         icon={<TriangleAlert className="size-7" />}
         tone={problem === "expired" ? "amber" : "danger"}
-        title={problem === "expired" ? "Reset Link Expired" : problem ? "Reset Link Invalid" : "Something went wrong"}
+        title={problem === "expired" ? "Reset Link Expired" : problem ? "Reset Link Invalid" : describeError(check.error).title}
         action={
           <ButtonLink href="/login" variant="secondary" size="lg" className="h-12 w-full rounded-xl text-base">
             Back to Login
@@ -187,7 +187,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
             <p className="text-sm">Request a new password reset link from your administrator.</p>
           </>
         ) : (
-          <p>We could not check your reset link. Refresh the page to try again.</p>
+          <p>{describeError(check.error).message}</p>
         )}
       </StatusCard>
     );

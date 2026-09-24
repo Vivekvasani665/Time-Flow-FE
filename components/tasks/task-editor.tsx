@@ -48,7 +48,7 @@ export function EditTask({ id }: { id: string }) {
   const { canFullEdit, isResolving } = useCanFullyEditTask(query.data?.project.id);
 
   if (query.isLoading || isResolving) return <PageSkeleton />;
-  if (query.error || !query.data) return <ErrorState title="Task unavailable" message={query.error?.message} onRetry={() => void query.refetch()} />;
+  if (query.error || !query.data) return <ErrorState title="Task unavailable" error={query.error} onRetry={() => query.refetch()} />;
   const t = query.data;
 
   return (

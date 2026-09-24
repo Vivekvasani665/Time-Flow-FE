@@ -18,9 +18,9 @@ import { PageSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCreateRole, useDeleteRole, usePermissionCatalog, useRole, useRoleUsers, useUpdateRole } from "@/hooks/use-roles";
-import { isApiError } from "@/lib/api/client";
 import { formatDateTime, fullName } from "@/lib/utils";
 import { RoleForm } from "./role-form";
+import { notifyError } from "@/lib/notify";
 
 export function CreateRole() {
   const router = useRouter();
@@ -29,7 +29,7 @@ export function CreateRole() {
   const create = useCreateRole();
 
   if (catalog.isLoading) return <PageSkeleton />;
-  if (catalog.error) return <ErrorState message={catalog.error.message} onRetry={() => void catalog.refetch()} />;
+  if (catalog.error) return <ErrorState error={catalog.error} onRetry={() => catalog.refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -60,7 +60,7 @@ export function RoleDetail({ id }: { id: string }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (role.isLoading || catalog.isLoading) return <PageSkeleton />;
-  if (role.error || !role.data) return <ErrorState title="Role unavailable" message={role.error?.message} onRetry={() => void role.refetch()} />;
+  if (role.error || !role.data) return <ErrorState title="Role unavailable" error={role.error} onRetry={() => role.refetch()} />;
 
   const r = role.data;
   const isSuperAdmin = r.isSystem && r.name.toLowerCase() === "super admin";
@@ -72,7 +72,7 @@ export function RoleDetail({ id }: { id: string }) {
       toast.success("Role deleted", { description: r.name });
       router.push("/roles");
     } catch (error) {
-      toast.error("Cannot delete role", { description: isApiError(error) ? error.message : "Try again." });
+      notifyError(error, { title: "Cannot delete role" });
       setConfirmDelete(false);
     }
   };
@@ -136,7 +136,7 @@ export function RoleDetail({ id }: { id: string }) {
                 ))}
               </div>
             ) : users.error ? (
-              <ErrorState message={users.error.message} onRetry={() => void users.refetch()} />
+              <ErrorState error={users.error} onRetry={() => users.refetch()} />
             ) : !users.data || users.data.items.length === 0 ? (
               <EmptyState title="No users assigned" description="Assign this role from the user form." />
             ) : (

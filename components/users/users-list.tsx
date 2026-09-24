@@ -21,10 +21,10 @@ import { useLatestPasswordResets } from "@/hooks/use-password-resets";
 import { useRoles } from "@/hooks/use-roles";
 import { useTableParams } from "@/hooks/use-table-params";
 import { useDeleteUser, useSetUserStatus, useUsers } from "@/hooks/use-users";
-import { isApiError } from "@/lib/api/client";
 import { isSuperAdmin } from "@/lib/labels";
 import { formatDate, formatDateTime, fullName } from "@/lib/utils";
 import type { User, UserListParams, UserStatus } from "@/types/api";
+import { notifyError } from "@/lib/notify";
 
 const FILTERS = ["status", "roleId"] as const;
 
@@ -115,7 +115,7 @@ export function UsersList() {
       }
       setPending(null);
     } catch (error) {
-      toast.error("Action failed", { description: isApiError(error) ? error.message : "Try again." });
+      notifyError(error, { title: "Action failed" });
     }
   };
 

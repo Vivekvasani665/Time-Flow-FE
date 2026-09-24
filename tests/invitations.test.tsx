@@ -100,7 +100,7 @@ describe("InviteUser", () => {
     await user.type(screen.getByLabelText(/email address/i), "x@example.com");
     await pickRole();
     await user.click(screen.getByRole("button", { name: "Generate Invitation Link" }));
-    expect(await screen.findByText("Unable to generate invitation. Please try again.")).toBeInTheDocument();
+    expect(await screen.findByText("Something went wrong on our end. Please try again shortly.")).toBeInTheDocument();
     expect(screen.queryByText("stack trace here")).not.toBeInTheDocument();
   });
 });

@@ -21,10 +21,10 @@ import { TONE } from "@/components/ui/tone";
 import { useProjects } from "@/hooks/use-projects";
 import { useTableParams } from "@/hooks/use-table-params";
 import { useChangeTaskStatus, useDeleteTask, useTasks } from "@/hooks/use-tasks";
-import { isApiError } from "@/lib/api/client";
 import { PRIORITIES, PRIORITY, TASK_STATUS, TASK_STATUSES } from "@/lib/labels";
 import { cn, formatDate, fullName, isOverdue } from "@/lib/utils";
 import type { Task, TaskListParams } from "@/types/api";
+import { notifyError } from "@/lib/notify";
 
 const FILTERS = ["status", "priority", "projectId", "assigneeId"] as const;
 
@@ -91,7 +91,7 @@ export function TasksList() {
       toast.success("Task deleted", { description: pending.title });
       setPending(null);
     } catch (error) {
-      toast.error("Delete failed", { description: isApiError(error) ? error.message : "Try again." });
+      notifyError(error, { title: "Delete failed" });
     }
   };
 
@@ -219,7 +219,7 @@ export function TasksList() {
                             { id: t.id, status: s },
                             {
                               onSuccess: () => toast.success("Status updated", { description: `${t.title} → ${TASK_STATUS[s].label}` }),
-                              onError: (error) => toast.error("Status change failed", { description: isApiError(error) ? error.message : "Reverted." }),
+                              onError: (error) => notifyError(error, { title: "Status change failed" }),
                             },
                           )
                         }

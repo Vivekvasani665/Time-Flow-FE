@@ -12,7 +12,7 @@ import { RankBadge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { isApiError } from "@/lib/api/client";
+import { describeError, isApiError } from "@/lib/api/client";
 import { invitationsService } from "@/services/invitations.service";
 
 const REDIRECT_MS = 2000;
@@ -73,12 +73,12 @@ export function AcceptInvitationForm({ token }: { token: string }) {
       setDone(true);
     } catch (error) {
       if (isDeadLink(error)) return setLinkDead(true);
-      if (!isApiError(error)) return setFormError("Unable to reach the server. Try again.");
+      if (!isApiError(error)) return setFormError(describeError(error).message);
       if (error.code === "RATE_LIMITED") return setFormError("Too many attempts. Wait a few minutes and try again.");
       if (error.code === "USER_EMAIL_EXISTS") return setFormError("An account with this email already exists. Go to the login page to sign in.");
       const fieldErrors = error.details.filter((d) => d.path === "password" || d.path === "confirmPassword");
       for (const d of fieldErrors) setError(d.path as keyof AcceptInvitationValues, { type: "server", message: d.message });
-      if (fieldErrors.length === 0) setFormError(error.status >= 500 ? "Unable to set your password. Please try again." : error.message);
+      if (fieldErrors.length === 0) setFormError(error.message);
     }
   });
 
@@ -123,14 +123,14 @@ export function AcceptInvitationForm({ token }: { token: string }) {
       <StatusCard
         icon={<TriangleAlert className="size-7" />}
         tone="danger"
-        title="Something went wrong"
+        title={describeError(check.error).title}
         action={
           <Button variant="secondary" size="lg" className="h-12 w-full rounded-xl text-base" onClick={() => void check.refetch()} loading={check.isFetching}>
-            Try again
+            Try Again
           </Button>
         }
       >
-        <p>We could not check your invitation link. Please try again.</p>
+        <p>{describeError(check.error).message}</p>
       </StatusCard>
     );
   }

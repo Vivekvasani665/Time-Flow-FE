@@ -102,7 +102,7 @@ function ActivityCards() {
         {query.isLoading ? (
           <Skeleton className="h-56" />
         ) : query.error && !stats ? (
-          <ErrorState message={query.error.message} onRetry={() => void query.refetch()} className="py-6" />
+          <ErrorState error={query.error} onRetry={() => query.refetch()} className="py-6" />
         ) : stats ? (
           <div className={cn("transition-opacity", query.isFetching && "opacity-70")}>
             <ActivityTrend days={stats.days} />
@@ -241,7 +241,7 @@ export function DashboardView() {
 
       {error && !data ? (
         <div className="hud-panel clip-corner">
-          <ErrorState message={error.message} onRetry={() => void refetch()} />
+          <ErrorState error={error} onRetry={() => refetch()} />
         </div>
       ) : isLoading || !data ? (
         <DashboardSkeleton />

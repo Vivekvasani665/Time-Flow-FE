@@ -42,7 +42,7 @@ export function ActivityChart({ params, onSelectDay }: { params: ActivityListPar
         {query.isLoading ? (
           <Skeleton className="h-52" />
         ) : query.error && !stats ? (
-          <ErrorState message={query.error.message} onRetry={() => void query.refetch()} className="py-6" />
+          <ErrorState error={query.error} onRetry={() => query.refetch()} className="py-6" />
         ) : stats ? (
           <DailyColumns stats={stats} fetching={query.isFetching} onSelectDay={onSelectDay} />
         ) : null}

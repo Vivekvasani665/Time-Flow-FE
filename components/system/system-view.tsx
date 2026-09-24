@@ -18,11 +18,11 @@ import { EmptyState, ErrorState } from "@/components/ui/states";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEmails, useEmailStats } from "@/hooks/use-emails";
 import { useQueueJobs, useQueues, useRetryJob } from "@/hooks/use-system";
-import { isApiError } from "@/lib/api/client";
 import type { Tone } from "@/lib/labels";
 import { TONE } from "@/components/ui/tone";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { EmailStats, EmailStatus, JobState } from "@/types/api";
+import { notifyError } from "@/lib/notify";
 
 const STATES: { state: JobState; label: string; short: string; tone: Tone }[] = [
   { state: "waiting", label: "Waiting", short: "Wait", tone: "blue" },
@@ -110,7 +110,7 @@ export function SystemView() {
 
       {queues.error && !queues.data ? (
         <div className="hud-panel clip-corner">
-          <ErrorState message={queues.error.message} onRetry={() => void queues.refetch()} />
+          <ErrorState error={queues.error} onRetry={() => queues.refetch()} />
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-3">
@@ -170,7 +170,7 @@ export function SystemView() {
             ))}
           </div>
         ) : jobs.error ? (
-          <ErrorState message={jobs.error.message} onRetry={() => void jobs.refetch()} />
+          <ErrorState error={jobs.error} onRetry={() => jobs.refetch()} />
         ) : !jobs.data || jobs.data.length === 0 ? (
           <EmptyState title={`No ${state} jobs`} description="There are no jobs in this state." />
         ) : (
@@ -200,7 +200,7 @@ export function SystemView() {
                             { name: selected, id: job.id },
                             {
                               onSuccess: () => toast.success("Job re-queued", { description: `${job.name} #${job.id}` }),
-                              onError: (e) => toast.error("Retry failed", { description: isApiError(e) ? e.message : "Try again." }),
+                              onError: (e) => notifyError(e, { title: "Retry failed" }),
                             },
                           )
                         }
@@ -259,7 +259,7 @@ export function SystemView() {
             ))}
           </div>
         ) : emails.error ? (
-          <ErrorState message={emails.error.message} onRetry={() => void emails.refetch()} />
+          <ErrorState error={emails.error} onRetry={() => emails.refetch()} />
         ) : !emails.data || emails.data.items.length === 0 ? (
           <EmptyState title="No emails yet" description="Emails appear here once the app sends one, such as a welcome email for a new user." />
         ) : (

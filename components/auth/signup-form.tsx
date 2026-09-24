@@ -8,7 +8,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Field, fieldA11y } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { isApiError } from "@/lib/api/client";
+import { describeError, isApiError } from "@/lib/api/client";
 import { applyServerErrors } from "@/lib/form-errors";
 import { authService } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
@@ -44,7 +44,7 @@ export function SignupForm({ onSuccess }: { onSuccess: (user: AuthUser) => void 
     try {
       onSuccess(await authService.register(values));
     } catch (error) {
-      if (!isApiError(error)) return setFormError("Unable to reach the server. Try again.");
+      if (!isApiError(error)) return setFormError(describeError(error).message);
       if (error.code === "RATE_LIMITED") return setFormError("Too many sign-up attempts. Wait a minute and try again.");
       // Email already taken and validation details land on their fields; anything else is a toast.
       applyServerErrors(error, setError, FIELDS);

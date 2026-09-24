@@ -16,8 +16,8 @@ import { PageSkeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/states";
 import { useTasks } from "@/hooks/use-tasks";
 import { useDeleteUser, useSetUserStatus, useUser } from "@/hooks/use-users";
-import { isApiError } from "@/lib/api/client";
 import { formatDate, formatDateTime, fullName, shortId } from "@/lib/utils";
+import { notifyError } from "@/lib/notify";
 
 export function UserDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -31,7 +31,7 @@ export function UserDetail({ id }: { id: string }) {
 
   if (query.isLoading) return <PageSkeleton />;
   if (query.error || !query.data) {
-    return <ErrorState title="User unavailable" message={query.error?.message} onRetry={() => void query.refetch()} />;
+    return <ErrorState title="User unavailable" error={query.error} onRetry={() => query.refetch()} />;
   }
 
   const user = query.data;
@@ -52,7 +52,7 @@ export function UserDetail({ id }: { id: string }) {
       }
       setConfirm(null);
     } catch (error) {
-      toast.error("Action failed", { description: isApiError(error) ? error.message : "Try again." });
+      notifyError(error, { title: "Action failed" });
     }
   };
 

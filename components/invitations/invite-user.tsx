@@ -13,7 +13,7 @@ import { Panel } from "@/components/ui/panel";
 import { Select } from "@/components/ui/select";
 import { useCreateInvitation } from "@/hooks/use-invitations";
 import { useRoles } from "@/hooks/use-roles";
-import { isApiError } from "@/lib/api/client";
+import { describeError, isApiError } from "@/lib/api/client";
 import type { CreatedInvitation } from "@/types/api";
 import { InvitationLinkCard } from "./invitation-link-card";
 
@@ -44,7 +44,7 @@ export function InviteUser() {
     try {
       setResult(await create.mutateAsync({ email: values.email.trim().toLowerCase(), roleId: values.roleId }));
     } catch (error) {
-      if (!isApiError(error)) return setFormError("Unable to generate invitation. Please try again.");
+      if (!isApiError(error)) return setFormError(describeError(error).message);
       if (error.code === "USER_EMAIL_EXISTS") return setError("email", { type: "server", message: "User with this email already exists." }, { shouldFocus: true });
       if (error.code === "VALIDATION_ERROR") {
         const roleIssue = error.details.some((d) => d.path === "roleId");
@@ -53,9 +53,8 @@ export function InviteUser() {
         if (emailIssue) setError("email", { type: "server", message: emailIssue.message });
         if (roleIssue || emailIssue) return;
       }
-      // These carry messages written for the admin; anything else (5xx, unknown) gets a generic one.
-      if (["RATE_LIMITED", "INVITATION_IN_PROGRESS", "FORBIDDEN", "NETWORK_ERROR"].includes(error.code)) return setFormError(error.message);
-      setFormError("Unable to generate invitation. Please try again.");
+      // Already status-mapped and safe to show: "Access Denied" copy for 403, the server's own words for 409/429, generic for 5xx.
+      setFormError(error.message);
     }
   });
 

@@ -2,9 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { toast } from "sonner";
 import { useAuth } from "@/components/auth/auth-provider";
-import { isApiError } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query-keys";
 import {
   applyPreferences,
@@ -16,6 +14,7 @@ import {
   type Preferences,
 } from "@/lib/preferences";
 import { preferencesService } from "@/services/preferences.service";
+import { notifyError } from "@/lib/notify";
 
 type PreferencesContextValue = {
   preferences: Preferences;
@@ -88,9 +87,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       // Roll back to whatever the server last told us, so the UI never claims
       // a setting that was not persisted.
       applyLocally(normalise(serverPrefs));
-      toast.error("Could not save settings", {
-        description: isApiError(err) ? err.message : "Check your connection and try again.",
-      });
+      notifyError(err, { title: "Could not save settings" });
     },
   });
 
