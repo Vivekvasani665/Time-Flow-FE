@@ -4,6 +4,7 @@ import { notifyError } from "@/lib/notify";
 
 const FIELD_CODES: Record<string, string> = {
   USER_EMAIL_EXISTS: "email",
+  USER_PHONE_EXISTS: "phone",
   ROLE_NAME_EXISTS: "name",
 };
 

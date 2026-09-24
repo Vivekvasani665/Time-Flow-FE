@@ -10,11 +10,12 @@ import { toast } from "sonner";
 import { SESSION_EXPIRED_REASON } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query-keys";
 import { cn, fullName } from "@/lib/utils";
-import { authService, type LoginOtpChallenge } from "@/services/auth.service";
+import { authService, type LoginOtpChallenge, type SignupOtpChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
 import { LoginForm } from "./login-form";
 import { LoginOtpForm } from "./login-otp-form";
 import { SignupForm } from "./signup-form";
+import { SignupComplete, SignupOtpForm } from "./signup-otp-form";
 
 const handwriting = Caveat({ subsets: ["latin"], weight: ["500"], display: "swap" });
 
@@ -30,6 +31,12 @@ type Copy = { title: string; subtitle: string; wave?: boolean };
 const COPY: Record<AuthMode, Copy> = {
   login: { title: "Welcome back", subtitle: "Enter your details to access your account.", wave: true },
   signup: { title: "Create your account", subtitle: "Sign up to start planning projects with your team." },
+};
+
+/** Shown while a new, unverified account waits for its code. */
+const SIGNUP_OTP_COPY: Copy = {
+  title: "Verify your account",
+  subtitle: "Enter the OTP sent to your email and mobile number.",
 };
 
 /** Shown in place of the sign-in copy while a password-verified login waits for its code. */
@@ -157,6 +164,9 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
   // Set when the API asks for an emailed code; the card then shows that step
   // instead of the password form. No session exists while this is non-null.
   const [otpChallenge, setOtpChallenge] = useState<LoginOtpChallenge | null>(null);
+  // Sign-up runs form → code → done on this one page; no session exists at any step.
+  const [signupChallenge, setSignupChallenge] = useState<SignupOtpChallenge | null>(null);
+  const [signupDone, setSignupDone] = useState(false);
 
   // Already signed in (or refreshable)? Skip the login screen.
   useEffect(() => {
@@ -177,14 +187,27 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
 
   const handleSuccess = (user: AuthUser) => {
     queryClient.setQueryData(queryKeys.me, user);
-    if (mode === "signup") toast.success("Account created", { description: `Welcome to TimeFlow, ${fullName(user)}.` });
-    else toast.success("Signed in", { description: `Welcome back, ${fullName(user)}.` });
+    toast.success("Signed in", { description: `Welcome back, ${fullName(user)}.` });
     router.replace(next);
     router.refresh();
   };
 
+  const handleSignupVerified = (user: AuthUser) => {
+    toast.success("Account created", { description: `Welcome to TimeFlow, ${fullName(user)}. Log in to get started.` });
+    setSignupChallenge(null);
+    setSignupDone(true);
+  };
+
+  const rawNext = params.get("next");
+  const loginHref = `/login${rawNext ? `?next=${encodeURIComponent(rawNext)}` : ""}`;
+  const signupHref = `/signup${rawNext ? `?next=${encodeURIComponent(rawNext)}` : ""}`;
+
   const awaitingOtp = mode === "login" && otpChallenge !== null;
-  const copy = awaitingOtp ? OTP_COPY : COPY[mode];
+  const verifyingSignup = mode === "signup" && signupChallenge !== null;
+  const signupComplete = mode === "signup" && signupDone;
+  // Mid-code or finished, switching tabs would abandon the step in progress.
+  const midFlow = awaitingOtp || verifyingSignup || signupComplete;
+  const copy = awaitingOtp ? OTP_COPY : verifyingSignup ? SIGNUP_OTP_COPY : COPY[mode];
 
   return (
     <div className="grid min-h-dvh bg-void lg:grid-cols-[1.15fr_1fr]">
@@ -256,13 +279,16 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
         <div className="w-full max-w-[34rem]">
           <BrandMark className="mb-8 lg:hidden" />
           <div className="rounded-3xl border border-line bg-panel p-6 shadow-[0_20px_50px_-24px_rgb(49_46_129/0.25)] sm:p-10">
-            {/* Switching account mid-code would abandon the pending sign-in. */}
-            {!awaitingOtp && <AuthModeSwitch mode={mode} next={params.get("next")} />}
-            <h1 className="flex items-center gap-2.5 text-3xl font-bold tracking-tight text-ink">
-              {copy.wave && <span aria-hidden="true">👋</span>}
-              {copy.title}
-            </h1>
-            <p className="mt-2 mb-8 text-ink-mute">{copy.subtitle}</p>
+            {!midFlow && <AuthModeSwitch mode={mode} next={rawNext} />}
+            {!signupComplete && (
+              <>
+                <h1 className="flex items-center gap-2.5 text-3xl font-bold tracking-tight text-ink">
+                  {copy.wave && <span aria-hidden="true">👋</span>}
+                  {copy.title}
+                </h1>
+                <p className="mt-2 mb-8 text-ink-mute">{copy.subtitle}</p>
+              </>
+            )}
             {mode === "login" && !awaitingOtp && params.get("reason") === SESSION_EXPIRED_REASON && (
               <div role="status" className="mb-6 flex items-start gap-3 rounded-lg border border-amber/30 bg-amber/10 px-3.5 py-3 text-sm text-ink animate-fade-up">
                 <Clock className="mt-0.5 size-4 shrink-0 text-amber" aria-hidden="true" />
@@ -271,12 +297,32 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
                 </span>
               </div>
             )}
+            {/* Kept mounted while the code is checked, so "Edit details" returns to what was typed. */}
+            {mode === "signup" && !signupComplete && (
+              <div hidden={verifyingSignup}>
+                <SignupForm onSuccess={setSignupChallenge} />
+              </div>
+            )}
             {mode === "signup" ? (
-              <SignupForm onSuccess={handleSuccess} />
+              signupComplete ? (
+                <SignupComplete loginHref={loginHref} />
+              ) : (
+                verifyingSignup && (
+                  <SignupOtpForm challenge={signupChallenge} onSuccess={handleSignupVerified} onCancel={() => setSignupChallenge(null)} />
+                )
+              )
             ) : awaitingOtp ? (
               <LoginOtpForm challenge={otpChallenge} onSuccess={handleSuccess} onCancel={() => setOtpChallenge(null)} />
             ) : (
               <LoginForm onSuccess={handleSuccess} onOtpRequired={setOtpChallenge} />
+            )}
+            {!midFlow && (
+              <p className="mt-6 border-t border-line pt-5 text-center text-sm text-ink-mute">
+                {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+                <Link href={mode === "login" ? signupHref : loginHref} replace className="font-medium text-cyan hover:underline">
+                  {mode === "login" ? "Sign up" : "Sign in"}
+                </Link>
+              </p>
             )}
           </div>
         </div>

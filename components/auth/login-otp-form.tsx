@@ -49,7 +49,7 @@ function secondsUntil(iso: string): number {
   return Math.max(0, Math.ceil((Date.parse(iso) - Date.now()) / 1000));
 }
 
-function formatDuration(seconds: number): string {
+export function formatDuration(seconds: number): string {
   if (seconds >= 60) {
     const minutes = Math.floor(seconds / 60);
     const rest = seconds % 60;
@@ -62,7 +62,7 @@ function formatDuration(seconds: number): string {
  * A ticking countdown. Both deadlines come from the server as absolute times, so
  * this needs no clock of its own beyond the tick.
  */
-function useCountdown(deadline: string): number {
+export function useCountdown(deadline: string): number {
   const [left, setLeft] = useState(() => secondsUntil(deadline));
   useEffect(() => {
     setLeft(secondsUntil(deadline));

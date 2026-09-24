@@ -1,24 +1,66 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertTriangle, ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, ArrowRight, Eye, EyeOff, Lock, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, fieldA11y } from "@/components/ui/field";
 import { Input, InputWithIcon } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { describeError as friendlyError, isApiError } from "@/lib/api/client";
-import { authService, type LoginOtpChallenge } from "@/services/auth.service";
+import { authService, type LoginInput, type LoginOtpChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
 
+/** Mobile numbers are sent with their country code; spaces, dashes and brackets are dropped. */
+const MOBILE_RULE = /^\+[1-9]\d{7,14}$/;
+const normalizeMobile = (value: string) => value.replace(/[\s()-]/g, "");
+const isEmailLike = (value: string) => value.includes("@");
+
 export const loginSchema = z.object({
-  email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
+  identifier: z
+    .string()
+    .trim()
+    .min(1, "Email or mobile number is required")
+    .superRefine((value, ctx) => {
+      if (isEmailLike(value)) {
+        if (!z.email().safeParse(value).success) ctx.addIssue({ code: "custom", message: "Enter a valid email address" });
+      } else if (!MOBILE_RULE.test(normalizeMobile(value))) {
+        ctx.addIssue({ code: "custom", message: "Enter a valid email, or a mobile number with its country code (e.g. +919876543210)" });
+      }
+    }),
   password: z.string().min(1, "Password is required"),
 });
 
 export type LoginValues = z.infer<typeof loginSchema>;
+
+/** The API takes the email or the mobile number, never both. */
+export function toLoginInput({ identifier, password }: LoginValues): LoginInput {
+  const value = identifier.trim();
+  return isEmailLike(value) ? { email: value, password } : { phone: normalizeMobile(value), password };
+}
+
+/** "Remember me" keeps the email or mobile number on this device, never the password. */
+const REMEMBER_KEY = "tf.login.identifier";
+
+function readRemembered(): string | null {
+  try {
+    return window.localStorage.getItem(REMEMBER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeRemembered(identifier: string | null) {
+  try {
+    if (identifier) window.localStorage.setItem(REMEMBER_KEY, identifier);
+    else window.localStorage.removeItem(REMEMBER_KEY);
+  } catch {
+    // Storage blocked (private mode): nothing to remember, and nothing breaks.
+  }
+}
 
 export const DEMO_ACCOUNTS = [
   { role: "Super Admin", email: "superadmin@timeflow.dev", initials: "SA", tone: "bg-blue" },
@@ -36,7 +78,10 @@ function describeError(error: unknown): string {
   if (!isApiError(error)) return friendlyError(error).message;
   switch (error.code) {
     case "INVALID_CREDENTIALS":
-      return "Invalid email or password.";
+      return "Invalid email / mobile number or password.";
+    // The API says what to do next (verify with the signup code).
+    case "ACCOUNT_NOT_VERIFIED":
+      return error.message;
     case "ACCOUNT_INACTIVE":
       return "This account is deactivated. Contact an administrator.";
     case "RATE_LIMITED":
@@ -60,17 +105,29 @@ export function LoginForm({
 }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
   const {
     register,
     handleSubmit,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
+  } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { identifier: "", password: "" } });
+
+  // Read after mount: localStorage does not exist during server rendering.
+  useEffect(() => {
+    const saved = readRemembered();
+    if (saved) {
+      setValue("identifier", saved);
+      setRemember(true);
+    }
+  }, [setValue]);
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
+    writeRemembered(remember ? values.identifier.trim() : null);
     try {
-      const result = await authService.login(values);
+      const result = await authService.login(toLoginInput(values));
       if ("requiresOtp" in result) {
         onOtpRequired(result);
         return;
@@ -96,15 +153,16 @@ export function LoginForm({
         </div>
       )}
 
-      <Field label="Email address" htmlFor="email" error={errors.email?.message} required>
+      <Field label="Email or mobile number" htmlFor="identifier" error={errors.identifier?.message} required>
         <InputWithIcon
-          {...fieldA11y("email", errors.email?.message)}
-          icon={<Mail className="size-4" />}
-          type="email"
-          autoComplete="email"
-          placeholder="you@company.com"
+          {...fieldA11y("identifier", errors.identifier?.message)}
+          icon={<UserRound className="size-4" />}
+          type="text"
+          inputMode="email"
+          autoComplete="username"
+          placeholder="you@company.com or +91 98765 43210"
           className="h-12 rounded-xl pl-10"
-          {...register("email")}
+          {...register("identifier")}
         />
       </Field>
 
@@ -132,6 +190,27 @@ export function LoginForm({
         </div>
       </Field>
 
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <label htmlFor="remember" className="flex cursor-pointer items-center gap-2 text-ink-dim">
+          <Checkbox id="remember" checked={remember} onCheckedChange={(v) => setRemember(v === true)} />
+          Remember me
+        </label>
+        <button
+          type="button"
+          onClick={() => setShowForgot((v) => !v)}
+          aria-expanded={showForgot}
+          aria-controls="forgot-password-note"
+          className="font-medium text-cyan hover:underline"
+        >
+          Forgot password?
+        </button>
+      </div>
+      {showForgot && (
+        <p id="forgot-password-note" role="status" className="rounded-lg border border-line bg-panel-2 px-3.5 py-3 text-sm text-ink-dim">
+          Ask your workspace administrator to reset it. They can send you a reset link by email.
+        </p>
+      )}
+
       <Button type="submit" size="lg" className="h-12 w-full rounded-xl text-base" loading={isSubmitting}>
         {isSubmitting ? "Signing in…" : "Sign in"}
         {!isSubmitting && <ArrowRight className="size-4" aria-hidden="true" />}
@@ -151,7 +230,7 @@ export function LoginForm({
                 type="button"
                 onClick={() => {
                   setFormError(null);
-                  setValue("email", account.email, { shouldValidate: true });
+                  setValue("identifier", account.email, { shouldValidate: true });
                   setValue("password", DEMO_PASSWORD, { shouldValidate: true });
                 }}
                 className="flex items-center gap-2.5 rounded-xl border border-line bg-panel px-3 py-3 text-left transition hover:border-cyan/40 hover:bg-panel-2"
@@ -168,10 +247,6 @@ export function LoginForm({
           </div>
         </div>
       )}
-
-      <p className="border-t border-line pt-5 text-center text-xs text-ink-mute">
-        Forgot your password? <span className="text-ink-dim">Ask your workspace administrator to reset it.</span>
-      </p>
     </form>
   );
 }

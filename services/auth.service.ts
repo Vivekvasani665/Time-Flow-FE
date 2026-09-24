@@ -1,8 +1,45 @@
 import { api, request, resetSessionTracking } from "@/lib/api/client";
 import type { AuthUser } from "@/types/api";
 
-export type LoginInput = { email: string; password: string };
-export type RegisterInput = { firstName: string; lastName: string; email: string; password: string };
+/** Sign in with the email or the mobile number on the account — the API takes exactly one. */
+export type LoginInput = { email: string; password: string } | { phone: string; password: string };
+/** `phone` in international form, country code included: `+919876543210`. */
+export type RegisterInput = { firstName: string; lastName: string; email: string; phone: string; password: string };
+
+export type OtpChannel = "email" | "sms";
+
+/**
+ * Signing up creates an unverified account and sends one code to both the email
+ * and the mobile number. No session is issued — the account can sign in only
+ * after the code is verified.
+ */
+export type SignupOtpChallenge = {
+  verificationId: string;
+  /** Masked, e.g. `v****@gmail.com` and `+91******3210` — safe to display. */
+  email: string;
+  phone: string;
+  /** Channels the current code actually reached. */
+  channels: OtpChannel[];
+  /** Local deadlines, derived from the API's relative seconds so a skewed clock still counts down correctly. */
+  expiresAt: string;
+  resendAvailableAt: string;
+};
+
+type SignupOtpResponse = Omit<SignupOtpChallenge, "expiresAt" | "resendAvailableAt"> & {
+  expiresInSeconds: number;
+  resendAvailableInSeconds: number;
+};
+
+const inSeconds = (seconds: number) => new Date(Date.now() + seconds * 1000).toISOString();
+
+const toSignupChallenge = ({ verificationId, email, phone, channels, expiresInSeconds, resendAvailableInSeconds }: SignupOtpResponse): SignupOtpChallenge => ({
+  verificationId,
+  email,
+  phone,
+  channels,
+  expiresAt: inSeconds(expiresInSeconds),
+  resendAvailableAt: inSeconds(resendAvailableInSeconds),
+});
 
 /**
  * A correct password does not always mean a session. With login OTP enabled the
@@ -65,8 +102,18 @@ export const authService = {
     return { requiresOtp: true, ...data };
   },
 
-  register: async (input: RegisterInput) =>
-    (await request<{ user: AuthUser }>("/auth/register", { method: "POST", body: input, skipAuthRefresh: true })).data.user,
+  register: async (input: RegisterInput): Promise<SignupOtpChallenge> =>
+    toSignupChallenge((await request<SignupOtpResponse>("/auth/register", { method: "POST", body: input, skipAuthRefresh: true })).data),
+
+  /** Activates the account. Signs nobody in — the user goes on to the login page. */
+  verifySignupOtp: async (input: { verificationId: string; otp: string }) =>
+    (await request<{ verified: true; user: AuthUser }>("/auth/register/verify-otp", { method: "POST", body: input, skipAuthRefresh: true })).data.user,
+
+  /** Sends a new code; the previous one stops working. */
+  resendSignupOtp: async (verificationId: string, channel: OtpChannel | "both" = "both"): Promise<SignupOtpChallenge> =>
+    toSignupChallenge(
+      (await request<SignupOtpResponse>("/auth/register/resend-otp", { method: "POST", body: { verificationId, channel }, skipAuthRefresh: true })).data,
+    ),
   logout: async () => {
     try {
       await request<null>("/auth/logout", { method: "POST", skipAuthRefresh: true });
