@@ -17,6 +17,7 @@ async function fillValid(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/last name/i), "Hopper");
   await user.type(screen.getByLabelText(/^email/i), "Grace@TimeFlow.dev");
   await user.type(screen.getByLabelText(/^password/i), "Compiler1");
+
 }
 
 describe("UserForm", () => {
