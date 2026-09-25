@@ -32,6 +32,7 @@ export function Providers({ children }: { children: ReactNode }) {
         // sonner reads prefers-color-scheme directly and cannot see our
         // data-theme, so pin it and let the token classNames below do the work.
         theme="light"
+        closeButton
         toastOptions={{
           classNames: {
             toast:
@@ -40,6 +41,8 @@ export function Providers({ children }: { children: ReactNode }) {
             description: "!text-ink-dim !text-sm",
             success: "[&_[data-icon]]:!text-lime",
             error: "[&_[data-icon]]:!text-danger",
+            actionButton: "!bg-cyan !text-white !rounded-md !font-medium",
+            closeButton: "!bg-panel !border-line !text-ink-mute hover:!text-ink",
           },
         }}
       />

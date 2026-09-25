@@ -1,6 +1,7 @@
 // Mirrors docs/api-contract.md. Keep in sync with the backend.
 
-export type UserStatus = "ACTIVE" | "INACTIVE";
+/** PENDING: signed up, but the signup code was not verified yet. Only the API sets it. */
+export type UserStatus = "ACTIVE" | "INACTIVE" | "PENDING";
 export type ProjectStatus = "PLANNING" | "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "REVIEW" | "COMPLETED";
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -59,9 +60,43 @@ export type AuthUser = {
   role: RoleRef;
   permissions: string[];
   preferences: Preferences;
+  /** Whether sign-in asks for an authenticator-app code after the password. */
   twoFactorEnabled: boolean;
   lastLoginAt: string | null;
   createdAt: string;
+};
+
+export type Passkey = {
+  id: string;
+  name: string;
+  /** Synced across devices (iCloud Keychain, Google Password Manager). */
+  backedUp: boolean;
+  createdAt: string;
+  lastUsedAt: string | null;
+};
+
+/** 2FA is on when the account has an authenticator app and/or at least one passkey. */
+export type TwoFactorStatus = {
+  enabled: boolean;
+  enabledAt: string | null;
+  /** Unused recovery codes; 0 while 2FA is off. */
+  recoveryCodesRemaining: number;
+  totp: {
+    enabled: boolean;
+    /** Setup started, not confirmed: finished here or on the login page at next sign-in. */
+    pending: boolean;
+  };
+  passkeys: Passkey[];
+};
+
+export type TwoFactorMethod = "totp" | "passkey" | "recovery";
+
+/** Started, not yet confirmed: the app must prove it has the secret before 2FA turns on. */
+export type TwoFactorSetup = {
+  /** Base32 key for typing in by hand when the QR code can't be scanned. */
+  secret: string;
+  otpauthUrl: string;
+  qrCodeDataUrl: string;
 };
 
 export type UserRef = {
@@ -349,3 +384,38 @@ export type MailSettings = {
 
 export type MailSettingsInput = { username: string; password?: string; fromName: string; enabled?: boolean };
 export type MailTestResult = { ok: boolean; code?: string; message?: string };
+
+export type PasswordResetStatus = "PENDING" | "COMPLETED" | "EXPIRED" | "CANCELLED";
+
+/** An administrator-issued reset link, as the API reports it: status and times only, never the token or password. */
+export type PasswordResetRequest = {
+  id: string;
+  userId: string;
+  status: PasswordResetStatus;
+  createdAt: string;
+  expiresAt: string;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  requestedBy: UserRef | null;
+};
+
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+
+/** A Super Admin's invitation as the API reports it: never the token. */
+export type Invitation = {
+  id: string;
+  email: string;
+  status: InvitationStatus;
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+  role: { id: string; name: string };
+  invitedBy: UserRef | null;
+  acceptedUser: UserRef | null;
+};
+
+/** The raw link is returned only once, when the invitation is generated. */
+export type CreatedInvitation = { invitation: Invitation; inviteUrl: string };
+
+export type InvitationCheck = { valid: true; email: string; role: { id: string; name: string }; expiresAt: string };

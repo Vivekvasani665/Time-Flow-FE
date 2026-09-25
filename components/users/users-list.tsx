@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, Pencil, Power, Trash2, UserPlus } from "lucide-react";
+import { Eye, KeyRound, MailPlus, Pencil, Power, Trash2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -10,22 +10,27 @@ import { DataTable, type Column } from "@/components/data-table/data-table";
 import { RowActions } from "@/components/data-table/row-actions";
 import { TableToolbar } from "@/components/data-table/table-toolbar";
 import { Avatar } from "@/components/ui/avatar";
-import { RankBadge, UserStatusBadge } from "@/components/ui/badge";
+import { PasswordResetStatusBadge, RankBadge, UserStatusBadge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
+import { PasswordResetDetailsDialog, SendPasswordResetDialog } from "@/components/users/password-reset-dialogs";
+import { useLatestPasswordResets } from "@/hooks/use-password-resets";
 import { useRoles } from "@/hooks/use-roles";
 import { useTableParams } from "@/hooks/use-table-params";
 import { useDeleteUser, useSetUserStatus, useUsers } from "@/hooks/use-users";
-import { isApiError } from "@/lib/api/client";
+import { isSuperAdmin } from "@/lib/labels";
 import { formatDate, formatDateTime, fullName } from "@/lib/utils";
 import type { User, UserListParams, UserStatus } from "@/types/api";
+import { notifyError } from "@/lib/notify";
 
 const FILTERS = ["status", "roleId"] as const;
 
 type PendingAction = { type: "delete" | "status"; user: User } | null;
+
+type ResetDialog = { type: "send"; user: Pick<User, "id" | "firstName" | "lastName" | "email">; resend: boolean } | { type: "details"; user: User } | null;
 
 export function UsersList() {
   const { user: me } = useAuth();
@@ -36,6 +41,11 @@ export function UsersList() {
   const deleteUser = useDeleteUser();
   const setStatus = useSetUserStatus();
   const [pending, setPending] = useState<PendingAction>(null);
+  // Password resets are a Super Admin power (enforced by the API); others never see the column.
+  const superAdmin = isSuperAdmin(me);
+  const pageUserIds = (query.data?.items ?? []).map((u) => u.id);
+  const resets = useLatestPasswordResets(pageUserIds, superAdmin);
+  const [resetDialog, setResetDialog] = useState<ResetDialog>(null);
 
   const columns: Column<User>[] = [
     {
@@ -55,6 +65,32 @@ export function UsersList() {
     },
     { key: "role", header: "Role", cell: (u) => <RankBadge roleName={u.role.name} /> },
     { key: "status", header: "Status", sortKey: "status", cell: (u) => <UserStatusBadge status={u.status} /> },
+    ...(superAdmin
+      ? [
+          {
+            key: "passwordReset",
+            header: "Password reset",
+            cell: (u: User) => {
+              const reset = resets.data?.get(u.id);
+              return reset ? (
+                <button
+                  type="button"
+                  className="rounded-full focus-visible:outline-2 focus-visible:outline-cyan"
+                  title="View password reset details"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setResetDialog({ type: "details", user: u });
+                  }}
+                >
+                  <PasswordResetStatusBadge status={reset.status} />
+                </button>
+              ) : (
+                <span className="text-sm text-ink-mute">—</span>
+              );
+            },
+          } satisfies Column<User>,
+        ]
+      : []),
     { key: "phone", header: "Phone", hideOnMobile: true, cell: (u) => <span className="tabular text-sm text-ink-dim">{u.phone ?? "—"}</span> },
     {
       key: "lastLoginAt",
@@ -79,7 +115,7 @@ export function UsersList() {
       }
       setPending(null);
     } catch (error) {
-      toast.error("Action failed", { description: isApiError(error) ? error.message : "Try again." });
+      notifyError(error, { title: "Action failed" });
     }
   };
 
@@ -91,11 +127,18 @@ export function UsersList() {
         title="Users"
         description="Manage team members, their roles and account status."
         actions={
-          <Can permission="users.create">
-            <ButtonLink href="/users/new" icon={<UserPlus className="size-4" />}>
-              New user
-            </ButtonLink>
-          </Can>
+          <>
+            {superAdmin && (
+              <ButtonLink href="/users/invite" variant="secondary" icon={<MailPlus className="size-4" />}>
+                Invite user
+              </ButtonLink>
+            )}
+            <Can permission="users.create">
+              <ButtonLink href="/users/new" icon={<UserPlus className="size-4" />}>
+                New user
+              </ButtonLink>
+            </Can>
+          </>
         }
       />
 
@@ -131,6 +174,7 @@ export function UsersList() {
                   options={[
                     { value: "ACTIVE", label: "Active" },
                     { value: "INACTIVE", label: "Inactive" },
+                    { value: "PENDING", label: "Pending verification" },
                   ]}
                 />
                 {can("roles.view") && (
@@ -177,6 +221,22 @@ export function UsersList() {
                   </DropdownMenuItem>
                 )}
               </Can>
+              {superAdmin && u.status === "ACTIVE" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    icon={<KeyRound />}
+                    onSelect={() => setResetDialog({ type: "send", user: u, resend: resets.data?.get(u.id)?.status === "PENDING" })}
+                  >
+                    {resets.data?.get(u.id)?.status === "PENDING" ? "Resend password reset" : "Send password reset"}
+                  </DropdownMenuItem>
+                  {resets.data?.has(u.id) && (
+                    <DropdownMenuItem icon={<Eye />} onSelect={() => setResetDialog({ type: "details", user: u })}>
+                      View reset status
+                    </DropdownMenuItem>
+                  )}
+                </>
+              )}
               {!isSelf && (
                 <Can permission="users.delete">
                   <DropdownMenuSeparator />
@@ -219,6 +279,17 @@ export function UsersList() {
         destructive={pending?.type === "delete" || pending?.user.status === "ACTIVE"}
         loading={deleteUser.isPending || setStatus.isPending}
         onConfirm={() => void confirm()}
+      />
+
+      <SendPasswordResetDialog
+        member={resetDialog?.type === "send" ? resetDialog.user : null}
+        resend={resetDialog?.type === "send" && resetDialog.resend}
+        onOpenChange={(open) => !open && setResetDialog(null)}
+      />
+      <PasswordResetDetailsDialog
+        member={resetDialog?.type === "details" ? resetDialog.user : null}
+        onOpenChange={(open) => !open && setResetDialog(null)}
+        onResend={(user, current) => setResetDialog({ type: "send", user, resend: current?.status === "PENDING" })}
       />
     </div>
   );

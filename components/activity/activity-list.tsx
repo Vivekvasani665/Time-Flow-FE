@@ -35,6 +35,9 @@ const ACTIONS = [
   "user.status_changed",
   "user.role_changed",
   "user.deleted",
+  "user.password_reset_requested",
+  "user.password_reset_completed",
+  "user.password_reset_expired",
   "role.created",
   "role.updated",
   "role.permissions_changed",
@@ -133,7 +136,7 @@ export function ActivityList() {
             ))}
           </div>
         ) : query.error && logs.length === 0 ? (
-          <ErrorState message={query.error.message} onRetry={() => void query.refetch()} />
+          <ErrorState error={query.error} onRetry={() => query.refetch()} />
         ) : logs.length === 0 ? (
           <EmptyState
             title={hasFilters ? "No activity matches" : "No activity yet"}

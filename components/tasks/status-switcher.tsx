@@ -2,11 +2,11 @@
 
 import { toast } from "sonner";
 import { useChangeTaskStatus } from "@/hooks/use-tasks";
-import { isApiError } from "@/lib/api/client";
 import { TASK_STATUS, TASK_STATUSES } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import type { Task, TaskStatus } from "@/types/api";
 import { TONE } from "@/components/ui/tone";
+import { notifyError } from "@/lib/notify";
 
 /** Segmented status control; changes apply immediately with optimistic updates. */
 export function StatusSwitcher({ task, disabled }: { task: Pick<Task, "id" | "status" | "title">; disabled?: boolean }) {
@@ -18,7 +18,7 @@ export function StatusSwitcher({ task, disabled }: { task: Pick<Task, "id" | "st
       { id: task.id, status },
       {
         onSuccess: () => toast.success("Status updated", { description: `${task.title} → ${TASK_STATUS[status].label}` }),
-        onError: (error) => toast.error("Status change failed", { description: isApiError(error) ? error.message : "Reverted." }),
+        onError: (error) => notifyError(error, { title: "Status change failed" }),
       },
     );
   };

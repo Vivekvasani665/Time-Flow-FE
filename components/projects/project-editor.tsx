@@ -33,7 +33,7 @@ export function EditProject({ id }: { id: string }) {
   const update = useUpdateProject(id);
 
   if (query.isLoading) return <PageSkeleton />;
-  if (query.error || !query.data) return <ErrorState title="Project unavailable" message={query.error?.message} onRetry={() => void query.refetch()} />;
+  if (query.error || !query.data) return <ErrorState title="Project unavailable" error={query.error} onRetry={() => query.refetch()} />;
   const p = query.data;
 
   return (

@@ -11,8 +11,8 @@ import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/states";
 import { useDisableMailSettings, useMailSettings, useSaveMailSettings, useTestMailSettings } from "@/hooks/use-mail-settings";
-import { isApiError } from "@/lib/api/client";
 import { formatDateTime } from "@/lib/utils";
+import { notifyError } from "@/lib/notify";
 
 const APP_PASSWORD_URL = "https://myaccount.google.com/apppasswords";
 
@@ -70,7 +70,7 @@ export function MailAccountPanel() {
           <Skeleton className="h-10" />
         </div>
       ) : settings.error ? (
-        <ErrorState message={settings.error.message} onRetry={() => void settings.refetch()} />
+        <ErrorState error={settings.error} onRetry={() => settings.refetch()} />
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-ink-dim">
@@ -148,7 +148,7 @@ export function MailAccountPanel() {
                       r.ok
                         ? toast.success("Gmail accepted the credentials")
                         : toast.error("Connection failed", { description: r.message }),
-                    onError: (e) => toast.error("Could not test", { description: isApiError(e) ? e.message : "Try again." }),
+                    onError: (e) => notifyError(e, { title: "Could not test" }),
                   },
                 );
               }}
@@ -169,7 +169,7 @@ export function MailAccountPanel() {
                       toast.success("Email account saved", { description: "TimeFlow will send from this address." });
                     },
                     // The server verifies before saving, so a failure here is a real credential problem.
-                    onError: (e) => toast.error("Not saved", { description: isApiError(e) ? e.message : "Try again." }),
+                    onError: (e) => notifyError(e, { title: "Not saved" }),
                   },
                 );
               }}
@@ -185,7 +185,7 @@ export function MailAccountPanel() {
                 onClick={() =>
                   disable.mutate(undefined, {
                     onSuccess: () => toast.success("Disabled", { description: "Falling back to the server's SMTP settings." }),
-                    onError: (e) => toast.error("Could not disable", { description: isApiError(e) ? e.message : "Try again." }),
+                    onError: (e) => notifyError(e, { title: "Could not disable" }),
                   })
                 }
               >

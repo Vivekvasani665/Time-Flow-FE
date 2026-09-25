@@ -19,6 +19,7 @@ const LABELS: Record<string, string> = {
   profile: "Profile",
   new: "Create",
   edit: "Edit",
+  invite: "Invite",
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;

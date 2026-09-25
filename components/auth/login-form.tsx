@@ -1,29 +1,66 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertTriangle, ArrowLeft, ArrowRight, Eye, EyeOff, KeyRound, Lock, Mail, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, ArrowRight, Eye, EyeOff, Lock, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, fieldA11y } from "@/components/ui/field";
 import { Input, InputWithIcon } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { isApiError } from "@/lib/api/client";
-import { authService, type TwoFactorChallenge } from "@/services/auth.service";
+import { describeError as friendlyError, isApiError } from "@/lib/api/client";
+import { authService, type LoginInput, type LoginOtpChallenge, type TwoFactorChallenge, type TwoFactorSetupChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
 
+/** Mobile numbers are sent with their country code; spaces, dashes and brackets are dropped. */
+const MOBILE_RULE = /^\+[1-9]\d{7,14}$/;
+const normalizeMobile = (value: string) => value.replace(/[\s()-]/g, "");
+const isEmailLike = (value: string) => value.includes("@");
+
 export const loginSchema = z.object({
-  email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
+  identifier: z
+    .string()
+    .trim()
+    .min(1, "Email or mobile number is required")
+    .superRefine((value, ctx) => {
+      if (isEmailLike(value)) {
+        if (!z.email().safeParse(value).success) ctx.addIssue({ code: "custom", message: "Enter a valid email address" });
+      } else if (!MOBILE_RULE.test(normalizeMobile(value))) {
+        ctx.addIssue({ code: "custom", message: "Enter a valid email, or a mobile number with its country code (e.g. +919876543210)" });
+      }
+    }),
   password: z.string().min(1, "Password is required"),
 });
 
 export type LoginValues = z.infer<typeof loginSchema>;
 
-const twoFactorSchema = z.object({ code: z.string().trim().min(6, "Enter the code from your authenticator app").max(32) });
+/** The API takes the email or the mobile number, never both. */
+export function toLoginInput({ identifier, password }: LoginValues): LoginInput {
+  const value = identifier.trim();
+  return isEmailLike(value) ? { email: value, password } : { phone: normalizeMobile(value), password };
+}
 
-type TwoFactorValues = z.infer<typeof twoFactorSchema>;
+/** "Remember me" keeps the email or mobile number on this device, never the password. */
+const REMEMBER_KEY = "tf.login.identifier";
+
+function readRemembered(): string | null {
+  try {
+    return window.localStorage.getItem(REMEMBER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeRemembered(identifier: string | null) {
+  try {
+    if (identifier) window.localStorage.setItem(REMEMBER_KEY, identifier);
+    else window.localStorage.removeItem(REMEMBER_KEY);
+  } catch {
+    // Storage blocked (private mode): nothing to remember, and nothing breaks.
+  }
+}
 
 export const DEMO_ACCOUNTS = [
   { role: "Super Admin", email: "superadmin@timeflow.dev", initials: "SA", tone: "bg-blue" },
@@ -38,10 +75,13 @@ export const DEMO_PASSWORD = "Password123!";
 const SHOW_DEMO_ACCOUNTS = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === "true";
 
 function describeError(error: unknown): string {
-  if (!isApiError(error)) return "Unable to reach the server. Try again.";
+  if (!isApiError(error)) return friendlyError(error).message;
   switch (error.code) {
     case "INVALID_CREDENTIALS":
-      return "Invalid email or password.";
+      return "Invalid email / mobile number or password.";
+    // The API says what to do next (verify with the signup code).
+    case "ACCOUNT_NOT_VERIFIED":
+      return error.message;
     case "ACCOUNT_INACTIVE":
       return "This account is deactivated. Contact an administrator.";
     case "RATE_LIMITED":
@@ -51,150 +91,69 @@ function describeError(error: unknown): string {
   }
 }
 
-/** Second sign-in step for accounts with two-factor authentication. */
-function TwoFactorForm({
-  challenge,
+/**
+ * Step one. A correct password may sign the user straight in, or only earn a
+ * second step: a code from their authenticator app (2FA) or, with login OTP
+ * enabled on the API, an emailed code. The parent then swaps in that screen.
+ * Nothing is authenticated until one of those lands.
+ */
+export function LoginForm({
   onSuccess,
-  onRestart,
+  onOtpRequired,
+  onTwoFactorRequired,
+  onTwoFactorSetupRequired,
 }: {
-  challenge: TwoFactorChallenge;
   onSuccess: (user: AuthUser) => void;
-  /** Back to the password step, optionally explaining why. */
-  onRestart: (reason?: string) => void;
+  onOtpRequired: (challenge: LoginOtpChallenge) => void;
+  onTwoFactorRequired?: (challenge: TwoFactorChallenge) => void;
+  /** A pending authenticator setup: the login page shows its QR code. */
+  onTwoFactorSetupRequired?: (challenge: TwoFactorSetupChallenge) => void;
 }) {
   const [formError, setFormError] = useState<string | null>(null);
-  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setError,
-    formState: { errors, isSubmitting },
-  } = useForm<TwoFactorValues>({ resolver: zodResolver(twoFactorSchema), defaultValues: { code: "" } });
-
-  const onSubmit = handleSubmit(async ({ code }) => {
-    setFormError(null);
-    try {
-      const { user, recoveryCodesRemaining } = await authService.loginTwoFactor(challenge.challengeToken, code);
-      if (recoveryCodesRemaining !== undefined) {
-        toast.warning("Recovery code used", {
-          description:
-            recoveryCodesRemaining === 0
-              ? "You have no recovery codes left. Generate new ones in your security settings."
-              : `You have ${recoveryCodesRemaining} recovery code${recoveryCodesRemaining === 1 ? "" : "s"} left.`,
-        });
-      }
-      onSuccess(user);
-    } catch (error) {
-      if (isApiError(error) && error.code === "TWO_FACTOR_CHALLENGE_INVALID") return onRestart(error.message);
-      if (isApiError(error) && error.code === "INVALID_TWO_FACTOR_CODE") {
-        setError("code", { type: "server", message: error.message }, { shouldFocus: true });
-        return;
-      }
-      if (isApiError(error) && error.code === "RATE_LIMITED") return setFormError("Too many code attempts. Wait a few minutes and try again.");
-      setFormError(describeError(error));
-    }
-  });
-
-  const toggleMode = () => {
-    setUseRecoveryCode((v) => !v);
-    setFormError(null);
-    reset({ code: "" });
-  };
-
-  return (
-    <form onSubmit={onSubmit} noValidate className="space-y-5">
-      <div className="flex items-start gap-3 rounded-xl border border-cyan/30 bg-cyan/5 px-4 py-3.5">
-        <ShieldCheck className="mt-0.5 size-5 shrink-0 text-cyan" aria-hidden="true" />
-        <div className="text-sm">
-          <p className="font-medium text-ink">Two-factor authentication</p>
-          <p className="mt-0.5 text-ink-mute">
-            {useRecoveryCode
-              ? "Enter one of the recovery codes you saved when you turned on two-factor authentication."
-              : "Open your authenticator app and enter the 6-digit code for TimeFlow."}
-          </p>
-        </div>
-      </div>
-
-      {formError && (
-        <div role="alert" className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger/10 px-3.5 py-3 text-sm text-danger">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          {formError}
-        </div>
-      )}
-
-      <Field label={useRecoveryCode ? "Recovery code" : "Authentication code"} htmlFor="code" error={errors.code?.message} required>
-        <InputWithIcon
-          {...fieldA11y("code", errors.code?.message)}
-          icon={<KeyRound className="size-4" />}
-          autoFocus
-          autoComplete="one-time-code"
-          inputMode={useRecoveryCode ? "text" : "numeric"}
-          placeholder={useRecoveryCode ? "xxxxx-xxxxx" : "123456"}
-          maxLength={useRecoveryCode ? 32 : 6}
-          className="h-12 rounded-xl pl-10 font-mono tracking-widest"
-          {...register("code")}
-        />
-      </Field>
-
-      <Button type="submit" size="lg" className="h-12 w-full rounded-xl text-base" loading={isSubmitting}>
-        {isSubmitting ? "Verifying…" : "Verify and sign in"}
-        {!isSubmitting && <ArrowRight className="size-4" aria-hidden="true" />}
-      </Button>
-
-      <div className="flex items-center justify-between gap-3 border-t border-line pt-5 text-sm">
-        <button type="button" onClick={() => onRestart()} className="inline-flex items-center gap-1.5 text-ink-mute hover:text-ink">
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Back
-        </button>
-        <button type="button" onClick={toggleMode} className="font-medium text-cyan hover:underline">
-          {useRecoveryCode ? "Use authenticator app" : "Use a recovery code"}
-        </button>
-      </div>
-
-      <p className="text-center text-xs text-ink-mute">
-        Lost your phone and recovery codes? <span className="text-ink-dim">Ask your workspace administrator to reset two-factor authentication.</span>
-      </p>
-    </form>
-  );
-}
-
-export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }) {
-  const [formError, setFormError] = useState<string | null>(null);
-  const [challenge, setChallenge] = useState<TwoFactorChallenge | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
   const {
     register,
     handleSubmit,
     setValue,
-    resetField,
     formState: { errors, isSubmitting },
-  } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
+  } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { identifier: "", password: "" } });
+
+  // Read after mount: localStorage does not exist during server rendering.
+  useEffect(() => {
+    const saved = readRemembered();
+    if (saved) {
+      setValue("identifier", saved);
+      setRemember(true);
+    }
+  }, [setValue]);
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
+    writeRemembered(remember ? values.identifier.trim() : null);
     try {
-      const result = await authService.login(values);
-      if (result.twoFactorRequired) setChallenge({ challengeToken: result.challengeToken, challengeExpiresAt: result.challengeExpiresAt });
-      else onSuccess(result.user);
+      const result = await authService.login(toLoginInput(values));
+      if ("requiresOtp" in result) {
+        onOtpRequired(result);
+        return;
+      }
+      if ("twoFactorRequired" in result) {
+        // No session yet: never fall through to onSuccess here.
+        if (onTwoFactorRequired) onTwoFactorRequired(result);
+        else setFormError("This account uses two-factor authentication, which is not supported here.");
+        return;
+      }
+      if ("twoFactorSetupRequired" in result) {
+        if (onTwoFactorSetupRequired) onTwoFactorSetupRequired(result);
+        else setFormError("Finish setting up two-factor authentication to sign in.");
+        return;
+      }
+      onSuccess(result.user);
     } catch (error) {
       setFormError(describeError(error));
     }
   });
-
-  if (challenge) {
-    return (
-      <TwoFactorForm
-        challenge={challenge}
-        onSuccess={onSuccess}
-        onRestart={(reason) => {
-          setChallenge(null);
-          resetField("password");
-          setFormError(reason ?? null);
-        }}
-      />
-    );
-  }
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
@@ -205,15 +164,16 @@ export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }
         </div>
       )}
 
-      <Field label="Email address" htmlFor="email" error={errors.email?.message} required>
+      <Field label="Email or mobile number" htmlFor="identifier" error={errors.identifier?.message} required>
         <InputWithIcon
-          {...fieldA11y("email", errors.email?.message)}
-          icon={<Mail className="size-4" />}
-          type="email"
-          autoComplete="email"
-          placeholder="you@company.com"
+          {...fieldA11y("identifier", errors.identifier?.message)}
+          icon={<UserRound className="size-4" />}
+          type="text"
+          inputMode="email"
+          autoComplete="username"
+          placeholder="you@company.com or +91 98765 43210"
           className="h-12 rounded-xl pl-10"
-          {...register("email")}
+          {...register("identifier")}
         />
       </Field>
 
@@ -241,6 +201,27 @@ export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }
         </div>
       </Field>
 
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <label htmlFor="remember" className="flex cursor-pointer items-center gap-2 text-ink-dim">
+          <Checkbox id="remember" checked={remember} onCheckedChange={(v) => setRemember(v === true)} />
+          Remember me
+        </label>
+        <button
+          type="button"
+          onClick={() => setShowForgot((v) => !v)}
+          aria-expanded={showForgot}
+          aria-controls="forgot-password-note"
+          className="font-medium text-cyan hover:underline"
+        >
+          Forgot password?
+        </button>
+      </div>
+      {showForgot && (
+        <p id="forgot-password-note" role="status" className="rounded-lg border border-line bg-panel-2 px-3.5 py-3 text-sm text-ink-dim">
+          Ask your workspace administrator to reset it. They can send you a reset link by email.
+        </p>
+      )}
+
       <Button type="submit" size="lg" className="h-12 w-full rounded-xl text-base" loading={isSubmitting}>
         {isSubmitting ? "Signing in…" : "Sign in"}
         {!isSubmitting && <ArrowRight className="size-4" aria-hidden="true" />}
@@ -260,7 +241,7 @@ export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }
                 type="button"
                 onClick={() => {
                   setFormError(null);
-                  setValue("email", account.email, { shouldValidate: true });
+                  setValue("identifier", account.email, { shouldValidate: true });
                   setValue("password", DEMO_PASSWORD, { shouldValidate: true });
                 }}
                 className="flex items-center gap-2.5 rounded-xl border border-line bg-panel px-3 py-3 text-left transition hover:border-cyan/40 hover:bg-panel-2"
@@ -277,10 +258,6 @@ export function LoginForm({ onSuccess }: { onSuccess: (user: AuthUser) => void }
           </div>
         </div>
       )}
-
-      <p className="border-t border-line pt-5 text-center text-xs text-ink-mute">
-        Forgot your password? <span className="text-ink-dim">Ask your workspace administrator to reset it.</span>
-      </p>
     </form>
   );
 }

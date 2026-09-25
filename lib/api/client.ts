@@ -1,24 +1,7 @@
-import type { ApiFailure, ApiSuccess, Paginated, ValidationDetail } from "@/types/api";
+import type { ApiFailure, ApiSuccess, Paginated } from "@/types/api";
+import { ApiError, logDiagnostic } from "./errors";
 
-export class ApiError extends Error {
-  readonly status: number;
-  readonly code: string;
-  readonly details: ValidationDetail[];
-  readonly requestId?: string;
-
-  constructor(status: number, code: string, message: string, details: ValidationDetail[] = [], requestId?: string) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-    this.code = code;
-    this.details = details;
-    this.requestId = requestId;
-  }
-}
-
-export function isApiError(error: unknown): error is ApiError {
-  return error instanceof ApiError;
-}
+export { ApiError, describeError, getUserFriendlyError, isApiError, type FriendlyError } from "./errors";
 
 type Query = Record<string, string | number | boolean | undefined | null>;
 
@@ -132,31 +115,49 @@ export async function ensureFreshSession(): Promise<void> {
   if (sessionNeedsRefresh()) await refreshSession();
 }
 
+/** Pages a signed-out visitor is meant to be on; a 401 there must never bounce them to /login. */
+const PUBLIC_PATHS = ["/login", "/signup", "/reset-password", "/accept-invitation"];
+export const SESSION_EXPIRED_REASON = "session-expired";
+
+// Several requests can 401 at once when a session dies; only the first navigates.
+let redirectingToLogin = false;
+
 let onSessionExpired: () => void = () => {
-  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-    const next = encodeURIComponent(window.location.pathname + window.location.search);
-    window.location.assign(`/login?next=${next}`);
-  }
+  resetSessionTracking();
+  if (typeof window === "undefined" || redirectingToLogin) return;
+  const { pathname, search } = window.location;
+  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return;
+  redirectingToLogin = true;
+  const next = encodeURIComponent(pathname + search);
+  window.location.assign(`/login?reason=${SESSION_EXPIRED_REASON}&next=${next}`);
 };
 
 export function setSessionExpiredHandler(handler: () => void) {
   onSessionExpired = handler;
 }
 
-async function parseFailure(res: Response): Promise<ApiError> {
-  let payload: Partial<ApiFailure> | null = null;
+async function parseFailure(res: Response, method: string, path: string): Promise<ApiError> {
+  let payload: (Partial<ApiFailure> & { debug?: string }) | null = null;
   try {
-    payload = (await res.json()) as Partial<ApiFailure>;
+    payload = (await res.json()) as Partial<ApiFailure> & { debug?: string };
   } catch {
+    // A proxy or gateway page (502/504) rather than the API's JSON envelope.
     payload = null;
   }
-  return new ApiError(
+  const error = new ApiError(
     res.status,
-    payload?.code ?? (res.status === 429 ? "RATE_LIMITED" : "INTERNAL_ERROR"),
-    payload?.message ?? (res.status >= 500 ? "The server hit an unexpected error." : res.statusText || "Request failed"),
+    payload?.code ?? (res.status === 429 ? "RATE_LIMITED" : res.status >= 500 ? "INTERNAL_ERROR" : "HTTP_ERROR"),
+    payload?.message ?? res.statusText ?? "",
     payload?.details ?? [],
     payload?.requestId,
   );
+  logDiagnostic(res.status >= 500 ? "warn" : "info", `${method} ${path} → ${res.status} ${error.code}: ${error.serverMessage}`, {
+    serverMessage: error.serverMessage,
+    requestId: error.requestId,
+    details: error.details,
+    debug: payload?.debug,
+  });
+  return error;
 }
 
 async function send(path: string, options: RequestOptions): Promise<Response> {
@@ -182,7 +183,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     res = await send(path, options);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
-    throw new ApiError(0, "NETWORK_ERROR", "Connection lost. Check your network and try again.");
+    logDiagnostic("warn", `${options.method ?? "GET"} ${path} → network error`, { cause: error });
+    throw new ApiError(0, "NETWORK_ERROR", error instanceof Error ? error.message : "Network request failed");
   }
 
   trackSessionExpiry(res);
@@ -197,7 +199,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     }
   }
 
-  if (!res.ok) throw await parseFailure(res);
+  if (!res.ok) throw await parseFailure(res, options.method ?? "GET", path);
   if (res.status === 204) return { success: true, data: undefined as T };
   return (await res.json()) as ApiSuccess<T>;
 }

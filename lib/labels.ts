@@ -1,4 +1,4 @@
-import type { Priority, ProjectStatus, TaskStatus, UserStatus } from "@/types/api";
+import type { PasswordResetStatus, Priority, ProjectStatus, TaskStatus, UserStatus } from "@/types/api";
 
 export type Tone = "cyan" | "violet" | "magenta" | "lime" | "amber" | "red" | "blue" | "gray";
 
@@ -27,7 +27,20 @@ export const PRIORITY: Record<Priority, { label: string; level: 1 | 2 | 3 | 4; t
 export const USER_STATUS: Record<UserStatus, { label: string; tone: Tone }> = {
   ACTIVE: { label: "Active", tone: "lime" },
   INACTIVE: { label: "Inactive", tone: "gray" },
+  PENDING: { label: "Pending verification", tone: "amber" },
 };
+
+export const PASSWORD_RESET_STATUS: Record<PasswordResetStatus, { label: string; tone: Tone }> = {
+  PENDING: { label: "Pending", tone: "amber" },
+  COMPLETED: { label: "Completed", tone: "lime" },
+  EXPIRED: { label: "Expired", tone: "red" },
+  CANCELLED: { label: "Cancelled", tone: "gray" },
+};
+
+/** The system role. Its name cannot be changed, so it is safe to match on. */
+export const SUPER_ADMIN_ROLE = "Super Admin";
+
+export const isSuperAdmin = (user: { role: { name: string } } | null | undefined) => user?.role.name === SUPER_ADMIN_ROLE;
 
 export const PROJECT_STATUSES = Object.keys(PROJECT_STATUS) as ProjectStatus[];
 export const TASK_STATUSES = Object.keys(TASK_STATUS) as TaskStatus[];

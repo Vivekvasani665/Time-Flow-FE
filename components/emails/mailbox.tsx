@@ -20,9 +20,9 @@ import { useDeleteEmail, useEmail, useEmails, useMarkEmailRead, useSyncInbox } f
 import { useTableParams } from "@/hooks/use-table-params";
 import type { Tone } from "@/lib/labels";
 import { cn, formatDateTime, fullName } from "@/lib/utils";
-import { isApiError } from "@/lib/api/client";
 import { toast } from "sonner";
 import type { EmailDetail, EmailLog, EmailStatus, MailBox } from "@/types/api";
+import { notifyError } from "@/lib/notify";
 
 const FILTERS = ["box", "status", "selected"] as const;
 
@@ -81,7 +81,7 @@ export function Mailbox() {
               onClick={() =>
                 syncInbox.mutate(undefined, {
                   onSuccess: () => toast.success("Syncing inbox", { description: "New replies will appear in a few seconds." }),
-                  onError: (e) => toast.error("Could not sync the inbox", { description: isApiError(e) ? e.message : "Try again." }),
+                  onError: (e) => notifyError(e, { title: "Could not sync the inbox" }),
                 })
               }
             >
@@ -133,7 +133,7 @@ export function Mailbox() {
               // The reading pane is showing what was just removed.
               update({ selected: undefined }, false);
             },
-            onError: (e) => toast.error("Could not delete", { description: isApiError(e) ? e.message : "Try again." }),
+            onError: (e) => notifyError(e, { title: "Could not delete" }),
           });
         }}
       />
@@ -190,7 +190,7 @@ export function Mailbox() {
                 ))}
               </div>
             ) : query.error && emails.length === 0 ? (
-              <ErrorState message={query.error.message} onRetry={() => void query.refetch()} />
+              <ErrorState error={query.error} onRetry={() => query.refetch()} />
             ) : emails.length === 0 ? (
               <EmptyState
                 title={box === "sent" ? "Nothing sent yet" : "Mailbox empty"}
@@ -237,7 +237,7 @@ export function Mailbox() {
                 <Skeleton className="h-56" />
               </div>
             ) : detail.error ? (
-              <ErrorState message={detail.error.message} onRetry={() => void detail.refetch()} />
+              <ErrorState error={detail.error} onRetry={() => detail.refetch()} />
             ) : detail.data ? (
               <MailReader
                 email={detail.data}

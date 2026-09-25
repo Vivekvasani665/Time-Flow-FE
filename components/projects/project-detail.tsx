@@ -18,9 +18,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { XpBar } from "@/components/ui/xp-bar";
 import { useDeleteProject, useProject } from "@/hooks/use-projects";
 import { useTasks } from "@/hooks/use-tasks";
-import { isApiError } from "@/lib/api/client";
 import { TASK_STATUSES } from "@/lib/labels";
 import { formatDate, formatDateTime, fullName, percent } from "@/lib/utils";
+import { notifyError } from "@/lib/notify";
 
 export function ProjectDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -32,7 +32,7 @@ export function ProjectDetail({ id }: { id: string }) {
   const [confirm, setConfirm] = useState(false);
 
   if (query.isLoading) return <PageSkeleton />;
-  if (query.error || !query.data) return <ErrorState title="Project unavailable" message={query.error?.message} onRetry={() => void query.refetch()} />;
+  if (query.error || !query.data) return <ErrorState title="Project unavailable" error={query.error} onRetry={() => query.refetch()} />;
 
   const p = query.data;
   const progress = percent(p.taskStats.completed, p.taskStats.total);
@@ -45,7 +45,7 @@ export function ProjectDetail({ id }: { id: string }) {
       toast.success("Project deleted", { description: p.name });
       router.push("/projects");
     } catch (error) {
-      toast.error("Delete failed", { description: isApiError(error) ? error.message : "Try again." });
+      notifyError(error, { title: "Delete failed" });
       setConfirm(false);
     }
   };

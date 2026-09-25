@@ -1,7 +1,8 @@
-import { AlertCircle, Inbox, RotateCcw, ShieldX } from "lucide-react";
+import { Inbox, ShieldX } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "./button";
+
+export { ErrorState } from "./error-state";
 
 type EmptyStateProps = {
   title: string;
@@ -22,35 +23,6 @@ export function EmptyState({ title, description, action, icon, className }: Empt
         {description && <p className="max-w-sm text-sm text-ink-mute">{description}</p>}
       </div>
       {action}
-    </div>
-  );
-}
-
-export function ErrorState({
-  title = "Something went wrong",
-  message,
-  onRetry,
-  className,
-}: {
-  title?: string;
-  message?: string;
-  onRetry?: () => void;
-  className?: string;
-}) {
-  return (
-    <div role="alert" className={cn("flex flex-col items-center justify-center gap-4 px-6 py-14 text-center", className)}>
-      <div className="flex size-12 items-center justify-center rounded-full bg-danger/10 text-danger">
-        <AlertCircle className="size-5" />
-      </div>
-      <div className="space-y-1.5">
-        <p className="text-sm font-semibold text-ink">{title}</p>
-        <p className="max-w-md text-sm text-ink-dim">{message ?? "We could not load this data."}</p>
-      </div>
-      {onRetry && (
-        <Button variant="secondary" size="sm" onClick={onRetry} icon={<RotateCcw className="size-3.5" />}>
-          Retry
-        </Button>
-      )}
     </div>
   );
 }

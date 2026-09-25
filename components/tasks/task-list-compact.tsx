@@ -60,7 +60,7 @@ export function TaskList({
       </div>
     );
   }
-  if (query.error) return <ErrorState message={query.error.message} onRetry={() => void query.refetch()} className="py-6" />;
+  if (query.error) return <ErrorState error={query.error} onRetry={() => query.refetch()} className="py-6" />;
   const tasks = query.data?.items ?? [];
   if (tasks.length === 0) return <EmptyState title="No tasks" description={emptyText} className="py-8" />;
   return <TaskRows tasks={tasks} showProject={showProject} showAssignee={showAssignee} />;

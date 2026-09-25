@@ -13,9 +13,9 @@ import { Panel } from "@/components/ui/panel";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { useUploadAvatar } from "@/hooks/use-users";
-import { isApiError } from "@/lib/api/client";
 import { applyServerErrors } from "@/lib/form-errors";
 import type { CreateUserInput, UpdateUserInput, UserStatus } from "@/types/api";
+import { notifyError } from "@/lib/notify";
 
 const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,128}$/;
 const PHONE_RULE = /^\+?[0-9\s\-().]{7,20}$/;
@@ -29,7 +29,7 @@ const base = {
     .trim()
     .refine((v) => v === "" || PHONE_RULE.test(v), "Enter a valid phone number"),
   roleId: z.string().min(1, "Select a role"),
-  status: z.enum(["ACTIVE", "INACTIVE"]),
+  status: z.enum(["ACTIVE", "INACTIVE", "PENDING"]),
   avatarUrl: z.string().nullable(),
 };
 
@@ -68,9 +68,10 @@ export function toUserPayload(values: UserFormValues, mode: "create" | "edit"): 
     email: values.email.trim().toLowerCase(),
     phone: values.phone.trim() || null,
     roleId: values.roleId,
-    status: values.status,
     avatarUrl: values.avatarUrl,
   };
+  // PENDING is only ever set by the signup flow; the API refuses it, so an untouched pending status is left out.
+  if (values.status !== "PENDING") payload.status = values.status;
   if (mode === "create" || values.password) payload.password = values.password;
   return payload;
 }
@@ -127,7 +128,7 @@ export function UserForm({ mode, roleOptions, defaultValues, lockAccess, onSubmi
       const url = await upload.mutateAsync(file);
       setValue("avatarUrl", url, { shouldDirty: true });
     } catch (error) {
-      toast.error("Upload failed", { description: isApiError(error) ? error.message : "Try again." });
+      notifyError(error, { title: "Upload failed" });
     } finally {
       if (fileRef.current) fileRef.current.value = "";
     }
@@ -233,7 +234,9 @@ export function UserForm({ mode, roleOptions, defaultValues, lockAccess, onSubmi
                   id="status"
                   value={field.value}
                   onValueChange={(v) => field.onChange(v ?? "ACTIVE")}
-                  options={STATUS_OPTIONS}
+                  options={
+                    defaultValues?.status === "PENDING" ? [...STATUS_OPTIONS, { value: "PENDING", label: "Pending verification" }] : STATUS_OPTIONS
+                  }
                   disabled={lockAccess}
                 />
               )}

@@ -50,7 +50,7 @@ export function EditUser({ id }: { id: string }) {
 
   if (query.isLoading) return <PageSkeleton />;
   if (query.error || !query.data) {
-    return <ErrorState title="User unavailable" message={query.error?.message} onRetry={() => void query.refetch()} />;
+    return <ErrorState title="User unavailable" error={query.error} onRetry={() => query.refetch()} />;
   }
   const user = query.data;
 

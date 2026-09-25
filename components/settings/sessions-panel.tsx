@@ -10,9 +10,9 @@ import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { useRevokeOtherSessions, useRevokeSession, useSessions } from "@/hooks/use-sessions";
-import { isApiError } from "@/lib/api/client";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { Session } from "@/types/api";
+import { notifyError } from "@/lib/notify";
 
 /**
  * A readable device name from the user-agent. Deliberately coarse — this is a
@@ -63,7 +63,7 @@ export function SessionsPanel() {
                 revokeOthers.mutate(undefined, {
                   onSuccess: ({ revoked }) =>
                     toast.success(revoked === 1 ? "Signed out 1 other device" : `Signed out ${revoked} other devices`),
-                  onError: (e) => toast.error("Could not sign out", { description: isApiError(e) ? e.message : "Try again." }),
+                  onError: (e) => notifyError(e, { title: "Could not sign out" }),
                 })
               }
             >
@@ -79,7 +79,7 @@ export function SessionsPanel() {
             ))}
           </div>
         ) : sessions.error ? (
-          <ErrorState message={sessions.error.message} onRetry={() => void sessions.refetch()} />
+          <ErrorState error={sessions.error} onRetry={() => sessions.refetch()} />
         ) : items.length === 0 ? (
           <EmptyState title="No active sessions" description="Sign in somewhere and it will show up here." />
         ) : (
@@ -138,7 +138,7 @@ export function SessionsPanel() {
               toast.success("Device signed out");
               setPending(null);
             },
-            onError: (e) => toast.error("Could not sign out", { description: isApiError(e) ? e.message : "Try again." }),
+            onError: (e) => notifyError(e, { title: "Could not sign out" }),
           });
         }}
       />

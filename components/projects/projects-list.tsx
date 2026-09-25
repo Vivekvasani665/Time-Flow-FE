@@ -24,10 +24,10 @@ import { TONE } from "@/components/ui/tone";
 import { useActivityLogs } from "@/hooks/use-activity";
 import { useDeleteProject, useProjectStats, useProjects } from "@/hooks/use-projects";
 import { useTableParams } from "@/hooks/use-table-params";
-import { isApiError } from "@/lib/api/client";
 import { actionLabel, PRIORITIES, PRIORITY, PROJECT_STATUS, PROJECT_STATUSES, type Tone } from "@/lib/labels";
 import { cn, formatDate, fullName, percent } from "@/lib/utils";
 import type { Project, ProjectListParams, ProjectStats, ProjectStatus } from "@/types/api";
+import { notifyError } from "@/lib/notify";
 
 const FILTERS = ["status", "priority", "managerId"] as const;
 
@@ -261,7 +261,7 @@ export function ProjectsList() {
       toast.success("Project deleted", { description: pending.name });
       setPending(null);
     } catch (error) {
-      toast.error("Delete failed", { description: isApiError(error) ? error.message : "Try again." });
+      notifyError(error, { title: "Delete failed" });
     }
   };
 

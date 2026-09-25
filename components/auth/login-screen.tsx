@@ -1,18 +1,23 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { BarChart3, CalendarDays, Check, Mail, SquareCheckBig, Users } from "lucide-react";
+import { BarChart3, CalendarDays, Check, Clock, Mail, SquareCheckBig, Users } from "lucide-react";
 import { Caveat } from "next/font/google";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { SESSION_EXPIRED_REASON } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query-keys";
 import { cn, fullName } from "@/lib/utils";
-import { authService } from "@/services/auth.service";
+import { authService, type LoginOtpChallenge, type SignupOtpChallenge, type TwoFactorChallenge, type TwoFactorSetupChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
 import { LoginForm } from "./login-form";
+import { LoginOtpForm } from "./login-otp-form";
 import { SignupForm } from "./signup-form";
+import { SignupComplete, SignupOtpForm } from "./signup-otp-form";
+import { TwoFactorLoginForm } from "./two-factor-login-form";
+import { TwoFactorSetupLoginForm } from "./two-factor-setup-login-form";
 
 const handwriting = Caveat({ subsets: ["latin"], weight: ["500"], display: "swap" });
 
@@ -23,9 +28,35 @@ function safeNext(next: string | null) {
 
 type AuthMode = "login" | "signup";
 
-const COPY: Record<AuthMode, { title: string; subtitle: string; wave?: boolean }> = {
+type Copy = { title: string; subtitle: string; wave?: boolean };
+
+const COPY: Record<AuthMode, Copy> = {
   login: { title: "Welcome back", subtitle: "Enter your details to access your account.", wave: true },
   signup: { title: "Create your account", subtitle: "Sign up to start planning projects with your team." },
+};
+
+/** Shown while a new, unverified account waits for its code. */
+const SIGNUP_OTP_COPY: Copy = {
+  title: "Verify your account",
+  subtitle: "Enter the OTP sent to your email and mobile number.",
+};
+
+/** Shown in place of the sign-in copy while a password-verified login waits for its code. */
+const OTP_COPY: Copy = {
+  title: "Verify your account",
+  subtitle: "Your password was accepted. Enter the verification code we just sent to finish signing in.",
+};
+
+/** Shown while a password-verified login waits for its second factor. */
+const TWO_FACTOR_COPY: Copy = {
+  title: "Verify your identity",
+  subtitle: "Confirm it's you with your passkey or authenticator app.",
+};
+
+/** Shown when the user started an authenticator setup in Settings and signs in before finishing it. */
+const TWO_FACTOR_SETUP_COPY: Copy = {
+  title: "Finish setting up two-factor authentication",
+  subtitle: "You turned on two-factor authentication. Scan the QR code to finish — you'll only need to do this once.",
 };
 
 const FEATURES = [
@@ -34,7 +65,7 @@ const FEATURES = [
   { icon: Mail, title: "Email notifications", body: "Get updates and never miss important changes.", tone: "text-violet bg-violet/10" },
 ] as const;
 
-function BrandMark({ className }: { className?: string }) {
+export function BrandMark({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-4", className)}>
       <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-cyan text-white shadow-lg shadow-cyan/25" aria-hidden="true">
@@ -144,6 +175,16 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
   const params = useSearchParams();
   const queryClient = useQueryClient();
   const next = safeNext(params.get("next"));
+  // Set when the API asks for an emailed code; the card then shows that step
+  // instead of the password form. No session exists while this is non-null.
+  const [otpChallenge, setOtpChallenge] = useState<LoginOtpChallenge | null>(null);
+  // Same idea for an account with an authenticator app. Held in memory only, so a
+  // reload drops it and the user signs in again — the challenge is never stored.
+  const [twoFactorChallenge, setTwoFactorChallenge] = useState<TwoFactorChallenge | null>(null);
+  const [setupChallenge, setSetupChallenge] = useState<TwoFactorSetupChallenge | null>(null);
+  // Sign-up runs form → code → done on this one page; no session exists at any step.
+  const [signupChallenge, setSignupChallenge] = useState<SignupOtpChallenge | null>(null);
+  const [signupDone, setSignupDone] = useState(false);
 
   // Already signed in (or refreshable)? Skip the login screen.
   useEffect(() => {
@@ -164,13 +205,29 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
 
   const handleSuccess = (user: AuthUser) => {
     queryClient.setQueryData(queryKeys.me, user);
-    if (mode === "signup") toast.success("Account created", { description: `Welcome to TimeFlow, ${fullName(user)}.` });
-    else toast.success("Signed in", { description: `Welcome back, ${fullName(user)}.` });
+    toast.success("Signed in", { description: `Welcome back, ${fullName(user)}.` });
     router.replace(next);
     router.refresh();
   };
 
-  const copy = COPY[mode];
+  const handleSignupVerified = (user: AuthUser) => {
+    toast.success("Account created", { description: `Welcome to TimeFlow, ${fullName(user)}. Log in to get started.` });
+    setSignupChallenge(null);
+    setSignupDone(true);
+  };
+
+  const rawNext = params.get("next");
+  const loginHref = `/login${rawNext ? `?next=${encodeURIComponent(rawNext)}` : ""}`;
+  const signupHref = `/signup${rawNext ? `?next=${encodeURIComponent(rawNext)}` : ""}`;
+
+  const awaitingOtp = mode === "login" && otpChallenge !== null;
+  const awaitingTwoFactor = mode === "login" && twoFactorChallenge !== null;
+  const finishingSetup = mode === "login" && setupChallenge !== null;
+  const verifyingSignup = mode === "signup" && signupChallenge !== null;
+  const signupComplete = mode === "signup" && signupDone;
+  // Mid-code or finished, switching tabs would abandon the step in progress.
+  const midFlow = awaitingOtp || awaitingTwoFactor || finishingSetup || verifyingSignup || signupComplete;
+  const copy = finishingSetup ? TWO_FACTOR_SETUP_COPY : awaitingTwoFactor ? TWO_FACTOR_COPY : awaitingOtp ? OTP_COPY : verifyingSignup ? SIGNUP_OTP_COPY : COPY[mode];
 
   return (
     <div className="grid min-h-dvh bg-void lg:grid-cols-[1.15fr_1fr]">
@@ -242,13 +299,55 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
         <div className="w-full max-w-[34rem]">
           <BrandMark className="mb-8 lg:hidden" />
           <div className="rounded-3xl border border-line bg-panel p-6 shadow-[0_20px_50px_-24px_rgb(49_46_129/0.25)] sm:p-10">
-            <AuthModeSwitch mode={mode} next={params.get("next")} />
-            <h1 className="flex items-center gap-2.5 text-3xl font-bold tracking-tight text-ink">
-              {copy.wave && <span aria-hidden="true">👋</span>}
-              {copy.title}
-            </h1>
-            <p className="mt-2 mb-8 text-ink-mute">{copy.subtitle}</p>
-            {mode === "signup" ? <SignupForm onSuccess={handleSuccess} /> : <LoginForm onSuccess={handleSuccess} />}
+            {!midFlow && <AuthModeSwitch mode={mode} next={rawNext} />}
+            {!signupComplete && (
+              <>
+                <h1 className="flex items-center gap-2.5 text-3xl font-bold tracking-tight text-ink">
+                  {copy.wave && <span aria-hidden="true">👋</span>}
+                  {copy.title}
+                </h1>
+                <p className="mt-2 mb-8 text-ink-mute">{copy.subtitle}</p>
+              </>
+            )}
+            {mode === "login" && !midFlow && params.get("reason") === SESSION_EXPIRED_REASON && (
+              <div role="status" className="mb-6 flex items-start gap-3 rounded-lg border border-amber/30 bg-amber/10 px-3.5 py-3 text-sm text-ink animate-fade-up">
+                <Clock className="mt-0.5 size-4 shrink-0 text-amber" aria-hidden="true" />
+                <span>
+                  <span className="font-semibold">Session Expired.</span> Your session has expired. Please sign in again to continue.
+                </span>
+              </div>
+            )}
+            {/* Kept mounted while the code is checked, so "Edit details" returns to what was typed. */}
+            {mode === "signup" && !signupComplete && (
+              <div hidden={verifyingSignup}>
+                <SignupForm onSuccess={setSignupChallenge} />
+              </div>
+            )}
+            {mode === "signup" ? (
+              signupComplete ? (
+                <SignupComplete loginHref={loginHref} />
+              ) : (
+                verifyingSignup && (
+                  <SignupOtpForm challenge={signupChallenge} onSuccess={handleSignupVerified} onCancel={() => setSignupChallenge(null)} />
+                )
+              )
+            ) : finishingSetup ? (
+              <TwoFactorSetupLoginForm challenge={setupChallenge} onSuccess={handleSuccess} onCancel={() => setSetupChallenge(null)} />
+            ) : awaitingTwoFactor ? (
+              <TwoFactorLoginForm challenge={twoFactorChallenge} onSuccess={handleSuccess} onCancel={() => setTwoFactorChallenge(null)} />
+            ) : awaitingOtp ? (
+              <LoginOtpForm challenge={otpChallenge} onSuccess={handleSuccess} onCancel={() => setOtpChallenge(null)} />
+            ) : (
+              <LoginForm onSuccess={handleSuccess} onOtpRequired={setOtpChallenge} onTwoFactorRequired={setTwoFactorChallenge} onTwoFactorSetupRequired={setSetupChallenge} />
+            )}
+            {!midFlow && (
+              <p className="mt-6 border-t border-line pt-5 text-center text-sm text-ink-mute">
+                {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+                <Link href={mode === "login" ? signupHref : loginHref} replace className="font-medium text-cyan hover:underline">
+                  {mode === "login" ? "Sign up" : "Sign in"}
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </section>

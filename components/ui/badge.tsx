@@ -1,8 +1,8 @@
 import { Shield, ShieldCheck, ShieldHalf, User, UserCog } from "lucide-react";
 import type { ReactNode } from "react";
-import { PRIORITY, PROJECT_STATUS, TASK_STATUS, USER_STATUS, roleRank, type Rank, type Tone } from "@/lib/labels";
+import { PASSWORD_RESET_STATUS, PRIORITY, PROJECT_STATUS, TASK_STATUS, USER_STATUS, roleRank, type Rank, type Tone } from "@/lib/labels";
 import { cn } from "@/lib/utils";
-import type { Priority, ProjectStatus, TaskStatus, UserStatus } from "@/types/api";
+import type { PasswordResetStatus, Priority, ProjectStatus, TaskStatus, UserStatus } from "@/types/api";
 import { TONE } from "./tone";
 
 export function Badge({ tone = "cyan", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
@@ -42,12 +42,23 @@ export function TaskStatusBadge({ status }: { status: TaskStatus }) {
   );
 }
 
+export function PasswordResetStatusBadge({ status }: { status: PasswordResetStatus }) {
+  const meta = PASSWORD_RESET_STATUS[status];
+  return (
+    <Badge tone={meta.tone}>
+      <span className={cn("size-1.5 rounded-full", TONE[meta.tone].dot)} aria-hidden="true" />
+      {meta.label}
+    </Badge>
+  );
+}
+
 export function UserStatusBadge({ status }: { status: UserStatus }) {
-  const meta = USER_STATUS[status];
+  // A status this build does not know yet still renders instead of crashing the page.
+  const meta = USER_STATUS[status] ?? { label: status, tone: "gray" as const };
   return (
     <span className={cn("inline-flex items-center gap-2 text-sm font-medium", TONE[meta.tone].text)}>
-      <span className={cn("size-2 rounded-full", TONE[meta.tone].dot, status === "ACTIVE" && "")} aria-hidden="true" />
-      {status === "ACTIVE" ? "Active" : "Inactive"}
+      <span className={cn("size-2 rounded-full", TONE[meta.tone].dot)} aria-hidden="true" />
+      {meta.label}
     </span>
   );
 }

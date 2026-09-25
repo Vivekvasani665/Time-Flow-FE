@@ -1,15 +1,16 @@
 import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
-import { toast } from "sonner";
 import { isApiError } from "@/lib/api/client";
+import { notifyError } from "@/lib/notify";
 
 const FIELD_CODES: Record<string, string> = {
   USER_EMAIL_EXISTS: "email",
+  USER_PHONE_EXISTS: "phone",
   ROLE_NAME_EXISTS: "name",
 };
 
 /**
  * Maps server errors onto form fields. Validation details become inline errors;
- * known conflict codes target their field; anything else becomes a toast.
+ * known conflict codes target their field; anything else becomes a status-based toast.
  * Returns true when at least one field error was set.
  */
 export function applyServerErrors<T extends FieldValues>(
@@ -18,7 +19,7 @@ export function applyServerErrors<T extends FieldValues>(
   fields: readonly string[],
 ): boolean {
   if (!isApiError(error)) {
-    toast.error("Unexpected error", { description: "Something went wrong. Please try again." });
+    notifyError(error);
     return false;
   }
 
@@ -39,8 +40,7 @@ export function applyServerErrors<T extends FieldValues>(
     }
   }
 
-  if (!applied) {
-    toast.error(error.code === "FORBIDDEN" ? "Access denied" : "Request failed", { description: error.message });
-  }
+  // Status-based title and a message that is safe by construction (see lib/api/errors.ts).
+  if (!applied) notifyError(error);
   return applied;
 }
