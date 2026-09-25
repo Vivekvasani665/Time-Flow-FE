@@ -1,19 +1,17 @@
 "use client";
 
-import { AlertTriangle, Fingerprint, KeyRound, ShieldCheck, Smartphone } from "lucide-react";
+import { AlertTriangle, Fingerprint, KeyRound, Smartphone } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { toast } from "sonner";
-import { RecoveryCodes, TotpQr } from "@/components/auth/recovery-codes";
+import { RecoveryCodes } from "@/components/auth/recovery-codes";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, fieldA11y } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { OtpInput } from "@/components/ui/otp-input";
-import { useEnableTwoFactor } from "@/hooks/use-two-factor";
 import { describeError as friendlyError, isApiError } from "@/lib/api/client";
 import { PasskeyCancelledError, passkeysSupported, provePasskey } from "@/lib/passkeys";
 import { twoFactorService, type TwoFactorProof } from "@/services/two-factor.service";
-import type { TwoFactorMethod, TwoFactorSetup, TwoFactorStatus } from "@/types/api";
+import type { TwoFactorMethod, TwoFactorStatus } from "@/types/api";
 
 const CODE_LENGTH = 6;
 
@@ -126,101 +124,6 @@ export function RecoveryCodesDialog({ codes, title = "Save your recovery codes",
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} title={title}>
       <RecoveryCodes codes={codes} onDone={onClose} />
-    </Dialog>
-  );
-}
-
-/**
- * QR → code → (recovery codes). Closing before the code leaves the setup
- * pending: the same QR comes back here, or on the login page at next sign-in.
- */
-export function TotpSetupDialog({ setup, onClose }: { setup: TwoFactorSetup; onClose: () => void }) {
-  const enable = useEnableTwoFactor();
-  const [code, setCode] = useState("");
-  const [showKey, setShowKey] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [codes, setCodes] = useState<string[] | null>(null);
-  const [finished, setFinished] = useState(false);
-
-  const close = () => {
-    if (!finished) toast.info("Setup saved for later", { description: "Finish it here any time, or scan the QR code on the login page at your next sign-in." });
-    onClose();
-  };
-
-  const confirm = (value: string) => {
-    if (enable.isPending) return;
-    setError(null);
-    enable.mutate(value, {
-      onSuccess: ({ recoveryCodes }) => {
-        setFinished(true);
-        toast.success(recoveryCodes ? "Two-factor authentication has been enabled successfully." : "Authenticator app added");
-        if (recoveryCodes) setCodes(recoveryCodes);
-        else onClose();
-      },
-      onError: (e) => {
-        setError(describeError(e));
-        setCode("");
-      },
-    });
-  };
-
-  if (codes) return <RecoveryCodesDialog codes={codes} onClose={onClose} />;
-
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => !open && close()}
-      title="Set up your authenticator app"
-      description="Add an extra layer of security to your TimeFlow account."
-      className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
-    >
-      <form
-        noValidate
-        className="space-y-6"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (code.length === CODE_LENGTH) confirm(code);
-          else setError("Enter the 6-digit code from your authenticator app.");
-        }}
-      >
-        <section className="space-y-1">
-          <h3 className="text-sm font-semibold text-ink">Step 1 · Install an authenticator app</h3>
-          <p className="text-sm text-ink-dim">Google Authenticator, Microsoft Authenticator, or any other TOTP app or browser extension.</p>
-        </section>
-
-        <section className="space-y-3">
-          <h3 className="text-sm font-semibold text-ink">Step 2 · Scan this QR code</h3>
-          <TotpQr qrCodeDataUrl={setup.qrCodeDataUrl} secret={setup.secret} showKey={showKey} onShowKey={() => setShowKey(true)} />
-        </section>
-
-        <section className="space-y-3">
-          <h3 className="text-sm font-semibold text-ink">Step 3 · Enter the 6-digit code from your app</h3>
-          <FormAlert message={error} />
-          <OtpInput
-            label="Code from your authenticator app"
-            value={code}
-            onChange={(value) => {
-              setCode(value);
-              if (error) setError(null);
-            }}
-            onComplete={confirm}
-            disabled={enable.isPending}
-            invalid={error !== null}
-          />
-        </section>
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-ink-mute">Not now? You can finish on the login page next time you sign in.</p>
-          <div className="flex gap-3">
-            <Button variant="ghost" onClick={close}>
-              Later
-            </Button>
-            <Button type="submit" loading={enable.isPending} disabled={code.length !== CODE_LENGTH} icon={<ShieldCheck className="size-4" />}>
-              Verify &amp; enable
-            </Button>
-          </div>
-        </div>
-      </form>
     </Dialog>
   );
 }

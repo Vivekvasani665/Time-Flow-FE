@@ -15,22 +15,20 @@ import {
   useRegenerateRecoveryCodes,
   useRemovePasskey,
   useRemoveTotp,
-  useTwoFactorSetup,
   useTwoFactorStatus,
 } from "@/hooks/use-two-factor";
 import { createPasskey, passkeysSupported } from "@/lib/passkeys";
 import { notifyError } from "@/lib/notify";
 import { formatDateTime } from "@/lib/utils";
 import { twoFactorService } from "@/services/two-factor.service";
-import type { Passkey, TwoFactorSetup, TwoFactorStatus } from "@/types/api";
-import { PasswordDialog, ProofDialog, RecoveryCodesDialog, TotpSetupDialog } from "./two-factor-dialogs";
+import type { Passkey, TwoFactorStatus } from "@/types/api";
+import { TotpSetupInline } from "./totp-setup-inline";
+import { PasswordDialog, ProofDialog, RecoveryCodesDialog } from "./two-factor-dialogs";
 
 /** At or below this many unused recovery codes, nudge the user to make new ones. */
 const LOW_RECOVERY_CODES = 3;
 
 type DialogState =
-  | { kind: "totp-password" }
-  | { kind: "totp-setup"; setup: TwoFactorSetup }
   | { kind: "totp-remove" }
   | { kind: "passkey-add" }
   | { kind: "passkey-remove"; passkey: Passkey }
@@ -84,6 +82,8 @@ function MethodRow({
 export function TwoFactorPanel() {
   const status = useTwoFactorStatus();
   const [dialog, setDialog] = useState<DialogState>(null);
+  // The authenticator setup opens inside this panel, not in a pop-up.
+  const [settingUpTotp, setSettingUpTotp] = useState(false);
   const data = status.data;
 
   return (
@@ -94,7 +94,7 @@ export function TwoFactorPanel() {
         ) : status.error ? (
           <ErrorState error={status.error} onRetry={() => status.refetch()} />
         ) : data ? (
-          <Methods data={data} openDialog={setDialog} />
+          <Methods data={data} openDialog={setDialog} settingUpTotp={settingUpTotp} setSettingUpTotp={setSettingUpTotp} />
         ) : null}
       </Panel>
 
@@ -103,7 +103,17 @@ export function TwoFactorPanel() {
   );
 }
 
-function Methods({ data, openDialog }: { data: TwoFactorStatus; openDialog: (d: DialogState) => void }) {
+function Methods({
+  data,
+  openDialog,
+  settingUpTotp,
+  setSettingUpTotp,
+}: {
+  data: TwoFactorStatus;
+  openDialog: (d: DialogState) => void;
+  settingUpTotp: boolean;
+  setSettingUpTotp: (open: boolean) => void;
+}) {
   const cancelSetup = useCancelTwoFactorSetup();
   const supported = passkeysSupported();
 
@@ -139,13 +149,14 @@ function Methods({ data, openDialog }: { data: TwoFactorStatus; openDialog: (d: 
                 : "Scan a QR code once; the app then makes a new 6-digit code every 30 seconds."
           }
           actions={
-            data.totp.enabled ? (
+            // While the setup is open below, its own buttons are the only ones that matter.
+            settingUpTotp ? undefined : data.totp.enabled ? (
               <Button size="sm" variant="ghost" icon={<Trash2 className="size-3.5" />} onClick={() => openDialog({ kind: "totp-remove" })}>
                 Remove
               </Button>
             ) : data.totp.pending ? (
               <>
-                <Button size="sm" onClick={() => openDialog({ kind: "totp-password" })}>
+                <Button size="sm" onClick={() => setSettingUpTotp(true)}>
                   Continue setup
                 </Button>
                 <Button
@@ -163,12 +174,14 @@ function Methods({ data, openDialog }: { data: TwoFactorStatus; openDialog: (d: 
                 </Button>
               </>
             ) : (
-              <Button size="sm" icon={<ShieldCheck className="size-3.5" />} onClick={() => openDialog({ kind: "totp-password" })}>
+              <Button size="sm" icon={<ShieldCheck className="size-3.5" />} onClick={() => setSettingUpTotp(true)}>
                 {data.enabled ? "Set up" : "Enable 2FA"}
               </Button>
             )
           }
-        />
+        >
+          {settingUpTotp && <TotpSetupInline pending={data.totp.pending} onClose={() => setSettingUpTotp(false)} />}
+        </MethodRow>
 
         <MethodRow
           icon={<Fingerprint className="size-4" />}
@@ -250,7 +263,6 @@ function Methods({ data, openDialog }: { data: TwoFactorStatus; openDialog: (d: 
 }
 
 function Dialogs({ data, dialog, setDialog }: { data: TwoFactorStatus; dialog: DialogState; setDialog: (d: DialogState) => void }) {
-  const setup = useTwoFactorSetup();
   const removeTotp = useRemoveTotp();
   const addPasskey = useAddPasskey();
   const removePasskey = useRemovePasskey();
@@ -260,18 +272,6 @@ function Dialogs({ data, dialog, setDialog }: { data: TwoFactorStatus; dialog: D
 
   if (!dialog) return null;
   switch (dialog.kind) {
-    case "totp-password":
-      return (
-        <PasswordDialog
-          title={data.totp.pending ? "Continue authenticator setup" : "Set up an authenticator app"}
-          description="Confirm your password to see the QR code."
-          confirmLabel="Continue"
-          onClose={close}
-          onConfirm={async (password) => setDialog({ kind: "totp-setup", setup: await setup.mutateAsync(password) })}
-        />
-      );
-    case "totp-setup":
-      return <TotpSetupDialog setup={dialog.setup} onClose={close} />;
     case "totp-remove":
       return (
         <PasswordDialog

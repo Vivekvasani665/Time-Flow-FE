@@ -52,7 +52,7 @@ async function typeCode(dialog: HTMLElement, user: ReturnType<typeof userEvent.s
 }
 
 describe("TwoFactorPanel", () => {
-  it("enable 2FA: password, then QR + setup key, then code, then recovery codes", async () => {
+  it("enable 2FA happens inside the panel: password, QR + setup key, code, recovery codes — no pop-up", async () => {
     const user = userEvent.setup();
     service.status.mockResolvedValue(status());
     service.setup.mockResolvedValueOnce(SETUP);
@@ -62,21 +62,22 @@ describe("TwoFactorPanel", () => {
     expect(await screen.findByText("Off")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /enable 2fa/i }));
 
-    let dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByLabelText(/password/i), "Password123!");
-    await user.click(within(dialog).getByRole("button", { name: /continue/i }));
+    await user.type(screen.getByLabelText(/password/i), "Password123!");
+    await user.click(screen.getByRole("button", { name: /^continue$/i }));
     await waitFor(() => expect(service.setup).toHaveBeenCalledWith("Password123!", expect.anything()));
 
-    dialog = await screen.findByRole("dialog", { name: /set up your authenticator app/i });
-    expect(within(dialog).getByAltText(/qr code/i)).toHaveAttribute("src", SETUP.qrCodeDataUrl);
-    await user.click(within(dialog).getByRole("button", { name: /show setup key/i }));
-    expect(within(dialog).getByText("JBSW Y3DP EHPK 3PXP JBSW Y3DP EHPK 3PXP")).toBeInTheDocument();
+    expect(await screen.findByAltText(/qr code/i)).toHaveAttribute("src", SETUP.qrCodeDataUrl);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /show setup key/i }));
+    expect(screen.getByText("JBSW Y3DP EHPK 3PXP JBSW Y3DP EHPK 3PXP")).toBeInTheDocument();
 
-    await typeCode(dialog, user, "123456");
+    await user.click(screen.getByRole("textbox", { name: /digit 1 of 6/i }));
+    await user.keyboard("123456");
     await waitFor(() => expect(service.enable).toHaveBeenCalledWith("123456", expect.anything()));
     const codes = await screen.findByRole("list", { name: /recovery codes/i });
     expect(within(codes).getAllByRole("listitem").map((li) => li.textContent)).toEqual(RECOVERY);
     expect(screen.getByText("These codes will not be shown again.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("reports a wrong password without showing a QR code", async () => {
@@ -86,11 +87,10 @@ describe("TwoFactorPanel", () => {
     renderWithProviders(<TwoFactorPanel />);
 
     await user.click(await screen.findByRole("button", { name: /enable 2fa/i }));
-    const dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByLabelText(/password/i), "nope");
-    await user.click(within(dialog).getByRole("button", { name: /continue/i }));
+    await user.type(screen.getByLabelText(/password/i), "nope");
+    await user.click(screen.getByRole("button", { name: /^continue$/i }));
 
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Incorrect password.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Incorrect password.");
     expect(screen.queryByAltText(/qr code/i)).not.toBeInTheDocument();
   });
 
