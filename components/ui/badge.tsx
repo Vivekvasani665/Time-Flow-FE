@@ -53,11 +53,12 @@ export function PasswordResetStatusBadge({ status }: { status: PasswordResetStat
 }
 
 export function UserStatusBadge({ status }: { status: UserStatus }) {
-  const meta = USER_STATUS[status];
+  // A status this build does not know yet still renders instead of crashing the page.
+  const meta = USER_STATUS[status] ?? { label: status, tone: "gray" as const };
   return (
     <span className={cn("inline-flex items-center gap-2 text-sm font-medium", TONE[meta.tone].text)}>
-      <span className={cn("size-2 rounded-full", TONE[meta.tone].dot, status === "ACTIVE" && "")} aria-hidden="true" />
-      {status === "ACTIVE" ? "Active" : "Inactive"}
+      <span className={cn("size-2 rounded-full", TONE[meta.tone].dot)} aria-hidden="true" />
+      {meta.label}
     </span>
   );
 }

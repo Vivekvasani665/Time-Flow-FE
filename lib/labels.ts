@@ -27,6 +27,7 @@ export const PRIORITY: Record<Priority, { label: string; level: 1 | 2 | 3 | 4; t
 export const USER_STATUS: Record<UserStatus, { label: string; tone: Tone }> = {
   ACTIVE: { label: "Active", tone: "lime" },
   INACTIVE: { label: "Inactive", tone: "gray" },
+  PENDING: { label: "Pending verification", tone: "amber" },
 };
 
 export const PASSWORD_RESET_STATUS: Record<PasswordResetStatus, { label: string; tone: Tone }> = {

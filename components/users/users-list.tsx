@@ -174,6 +174,7 @@ export function UsersList() {
                   options={[
                     { value: "ACTIVE", label: "Active" },
                     { value: "INACTIVE", label: "Inactive" },
+                    { value: "PENDING", label: "Pending verification" },
                   ]}
                 />
                 {can("roles.view") && (

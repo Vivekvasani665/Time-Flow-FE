@@ -29,7 +29,7 @@ const base = {
     .trim()
     .refine((v) => v === "" || PHONE_RULE.test(v), "Enter a valid phone number"),
   roleId: z.string().min(1, "Select a role"),
-  status: z.enum(["ACTIVE", "INACTIVE"]),
+  status: z.enum(["ACTIVE", "INACTIVE", "PENDING"]),
   avatarUrl: z.string().nullable(),
 };
 
@@ -68,9 +68,10 @@ export function toUserPayload(values: UserFormValues, mode: "create" | "edit"): 
     email: values.email.trim().toLowerCase(),
     phone: values.phone.trim() || null,
     roleId: values.roleId,
-    status: values.status,
     avatarUrl: values.avatarUrl,
   };
+  // PENDING is only ever set by the signup flow; the API refuses it, so an untouched pending status is left out.
+  if (values.status !== "PENDING") payload.status = values.status;
   if (mode === "create" || values.password) payload.password = values.password;
   return payload;
 }
@@ -233,7 +234,9 @@ export function UserForm({ mode, roleOptions, defaultValues, lockAccess, onSubmi
                   id="status"
                   value={field.value}
                   onValueChange={(v) => field.onChange(v ?? "ACTIVE")}
-                  options={STATUS_OPTIONS}
+                  options={
+                    defaultValues?.status === "PENDING" ? [...STATUS_OPTIONS, { value: "PENDING", label: "Pending verification" }] : STATUS_OPTIONS
+                  }
                   disabled={lockAccess}
                 />
               )}

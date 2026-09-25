@@ -1,6 +1,7 @@
 // Mirrors docs/api-contract.md. Keep in sync with the backend.
 
-export type UserStatus = "ACTIVE" | "INACTIVE";
+/** PENDING: signed up, but the signup code was not verified yet. Only the API sets it. */
+export type UserStatus = "ACTIVE" | "INACTIVE" | "PENDING";
 export type ProjectStatus = "PLANNING" | "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "REVIEW" | "COMPLETED";
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
