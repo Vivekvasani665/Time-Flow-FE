@@ -11,7 +11,7 @@ import { Field, fieldA11y } from "@/components/ui/field";
 import { Input, InputWithIcon } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { describeError as friendlyError, isApiError } from "@/lib/api/client";
-import { authService, type LoginInput, type LoginOtpChallenge } from "@/services/auth.service";
+import { authService, type LoginInput, type LoginOtpChallenge, type TwoFactorChallenge, type TwoFactorSetupChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
 
 /** Mobile numbers are sent with their country code; spaces, dashes and brackets are dropped. */
@@ -92,16 +92,22 @@ function describeError(error: unknown): string {
 }
 
 /**
- * Step one. A correct password may sign the user straight in, or — with login
- * OTP enabled on the API — only earn an emailed code, in which case the parent
- * swaps in the code screen. Nothing is authenticated until one of those lands.
+ * Step one. A correct password may sign the user straight in, or only earn a
+ * second step: a code from their authenticator app (2FA) or, with login OTP
+ * enabled on the API, an emailed code. The parent then swaps in that screen.
+ * Nothing is authenticated until one of those lands.
  */
 export function LoginForm({
   onSuccess,
   onOtpRequired,
+  onTwoFactorRequired,
+  onTwoFactorSetupRequired,
 }: {
   onSuccess: (user: AuthUser) => void;
   onOtpRequired: (challenge: LoginOtpChallenge) => void;
+  onTwoFactorRequired?: (challenge: TwoFactorChallenge) => void;
+  /** A pending authenticator setup: the login page shows its QR code. */
+  onTwoFactorSetupRequired?: (challenge: TwoFactorSetupChallenge) => void;
 }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -133,9 +139,14 @@ export function LoginForm({
         return;
       }
       if ("twoFactorRequired" in result) {
-        // The API supports authenticator apps; this UI does not yet, so say so
-        // rather than navigating to a dashboard with no session.
-        setFormError("This account uses an authenticator app, which is not supported here yet.");
+        // No session yet: never fall through to onSuccess here.
+        if (onTwoFactorRequired) onTwoFactorRequired(result);
+        else setFormError("This account uses two-factor authentication, which is not supported here.");
+        return;
+      }
+      if ("twoFactorSetupRequired" in result) {
+        if (onTwoFactorSetupRequired) onTwoFactorSetupRequired(result);
+        else setFormError("Finish setting up two-factor authentication to sign in.");
         return;
       }
       onSuccess(result.user);

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Panel } from "@/components/ui/panel";
 import { usePreferences } from "@/components/settings/preferences-provider";
 import { SessionsPanel } from "@/components/settings/sessions-panel";
+import { TwoFactorPanel } from "@/components/settings/two-factor-panel";
 import { cn } from "@/lib/utils";
 import type { Density, Theme } from "@/lib/preferences";
 
@@ -26,7 +27,7 @@ export function SettingsView() {
     <div className="space-y-6">
       <PageHeader
         title="Settings"
-        description="Personalize how TimeFlow looks. Changes apply instantly and sync across your devices."
+        description="Personalize how TimeFlow looks and keep your account secure."
       />
 
       <Panel title="Theme" subtitle="Choose how the interface looks" icon={<Sun />}>
@@ -93,6 +94,8 @@ export function SettingsView() {
           })}
         </div>
       </Panel>
+
+      <TwoFactorPanel />
 
       <SessionsPanel />
     </div>

@@ -1,5 +1,6 @@
 import { api, request, resetSessionTracking } from "@/lib/api/client";
-import type { AuthUser } from "@/types/api";
+import type { AuthenticationResponseJSON, PublicKeyCredentialRequestOptionsJSON } from "@/lib/passkeys";
+import type { AuthUser, TwoFactorMethod, TwoFactorSetup } from "@/types/api";
 
 /** Sign in with the email or the mobile number on the account — the API takes exactly one. */
 export type LoginInput = { email: string; password: string } | { phone: string; password: string };
@@ -81,14 +82,27 @@ export type LoginOtpChallenge = {
   resendAvailableInSeconds: number;
 };
 
-/** Accounts with an authenticator app take this branch instead of the emailed code. */
+/** Accounts with 2FA take this branch instead of the emailed code. */
 export type TwoFactorChallenge = {
   twoFactorRequired: true;
   challengeToken: string;
   challengeExpiresAt: string;
+  /** What this account can use. Absent from older APIs, which means authenticator + recovery. */
+  methods?: TwoFactorMethod[];
 };
 
-export type LoginResult = { signedIn: true; user: AuthUser } | LoginOtpChallenge | TwoFactorChallenge;
+/**
+ * 2FA is off, but the user started an authenticator setup in Settings: this
+ * sign-in finishes it. `setup` is the same QR code Settings showed.
+ */
+export type TwoFactorSetupChallenge = {
+  twoFactorSetupRequired: true;
+  challengeToken: string;
+  challengeExpiresAt: string;
+  setup: TwoFactorSetup;
+};
+
+export type LoginResult = { signedIn: true; user: AuthUser } | LoginOtpChallenge | TwoFactorChallenge | TwoFactorSetupChallenge;
 
 /** `/auth/login/otp/resend` returns the same challenge without the discriminator. */
 type ResendResponse = Omit<LoginOtpChallenge, "requiresOtp">;
@@ -100,13 +114,14 @@ export const authService = {
    * bounces straight back off the auth gate in middleware.
    */
   login: async (input: LoginInput): Promise<LoginResult> => {
-    const { data } = await request<{ user: AuthUser } | LoginOtpChallenge | TwoFactorChallenge>("/auth/login", {
+    const { data } = await request<{ user: AuthUser } | LoginOtpChallenge | TwoFactorChallenge | TwoFactorSetupChallenge>("/auth/login", {
       method: "POST",
       body: input,
       skipAuthRefresh: true,
     });
     if ("requiresOtp" in data && data.requiresOtp) return data;
     if ("twoFactorRequired" in data && data.twoFactorRequired) return data;
+    if ("twoFactorSetupRequired" in data && data.twoFactorSetupRequired) return data;
     return { signedIn: true, user: (data as { user: AuthUser }).user };
   },
 
@@ -123,6 +138,42 @@ export const authService = {
     });
     return { requiresOtp: true, ...data };
   },
+
+  /**
+   * Step two for an account with an authenticator app: trades the challenge and a
+   * 6-digit code (or a recovery code) for a session.
+   */
+  verifyTwoFactorLogin: async (input: { challengeToken: string; code: string }) =>
+    (
+      await request<{ user: AuthUser; recoveryCodesRemaining?: number }>("/auth/login/2fa", {
+        method: "POST",
+        body: input,
+        skipAuthRefresh: true,
+      })
+    ).data,
+
+  /** Options for the browser's passkey prompt, bound to this sign-in attempt. */
+  passkeyLoginOptions: async (challengeToken: string) =>
+    (
+      await request<PublicKeyCredentialRequestOptionsJSON>("/auth/login/2fa/passkey/options", {
+        method: "POST",
+        body: { challengeToken },
+        skipAuthRefresh: true,
+      })
+    ).data,
+
+  loginWithPasskey: async (input: { challengeToken: string; response: AuthenticationResponseJSON }) =>
+    (await request<{ user: AuthUser }>("/auth/login/2fa/passkey", { method: "POST", body: input, skipAuthRefresh: true })).data.user,
+
+  /** Finishes a pending authenticator setup: turns 2FA on, signs in, and returns the recovery codes (shown once). */
+  completeTwoFactorSetup: async (input: { challengeToken: string; code: string }) =>
+    (
+      await request<{ user: AuthUser; recoveryCodes: string[] }>("/auth/login/2fa/setup", {
+        method: "POST",
+        body: input,
+        skipAuthRefresh: true,
+      })
+    ).data,
 
   register: async (input: RegisterInput): Promise<SignupOtpChallenge> =>
     toSignupChallenge((await request<SignupOtpResponse>("/auth/register", { method: "POST", body: input, skipAuthRefresh: true })).data),

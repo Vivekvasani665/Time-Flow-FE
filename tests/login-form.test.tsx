@@ -127,4 +127,41 @@ describe("LoginForm", () => {
     expect(screen.getByLabelText(/email or mobile/i)).toHaveValue("employee@timeflow.dev");
     expect(screen.getByLabelText(/^password/i)).toHaveValue(DEMO_PASSWORD);
   });
+
+  it("hands an authenticator-app challenge to the next step instead of signing in", async () => {
+    const user = userEvent.setup();
+    const onSuccess = vi.fn();
+    const onTwoFactorRequired = vi.fn();
+    const challenge = { twoFactorRequired: true as const, challengeToken: "t", challengeExpiresAt: new Date().toISOString() };
+    login.mockResolvedValueOnce(challenge);
+    render(<LoginForm onSuccess={onSuccess} onOtpRequired={vi.fn()} onTwoFactorRequired={onTwoFactorRequired} />);
+
+    await user.type(screen.getByLabelText(/email or mobile/i), "admin@timeflow.dev");
+    await user.type(screen.getByLabelText(/^password/i), "Password123!");
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    await waitFor(() => expect(onTwoFactorRequired).toHaveBeenCalledWith(challenge));
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  it("hands a pending 2FA setup to the QR step instead of signing in", async () => {
+    const user = userEvent.setup();
+    const onSuccess = vi.fn();
+    const onTwoFactorSetupRequired = vi.fn();
+    const challenge = {
+      twoFactorSetupRequired: true as const,
+      challengeToken: "t",
+      challengeExpiresAt: new Date().toISOString(),
+      setup: { secret: "S", otpauthUrl: "otpauth://x", qrCodeDataUrl: "data:image/png;base64,QR" },
+    };
+    login.mockResolvedValueOnce(challenge);
+    render(<LoginForm onSuccess={onSuccess} onOtpRequired={vi.fn()} onTwoFactorSetupRequired={onTwoFactorSetupRequired} />);
+
+    await user.type(screen.getByLabelText(/email or mobile/i), "admin@timeflow.dev");
+    await user.type(screen.getByLabelText(/^password/i), "Password123!");
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    await waitFor(() => expect(onTwoFactorSetupRequired).toHaveBeenCalledWith(challenge));
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
 });

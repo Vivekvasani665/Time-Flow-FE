@@ -40,6 +40,7 @@ export const queryKeys = {
   },
   notifications: ["notifications"] as const,
   sessions: ["auth", "sessions"] as const,
+  twoFactor: ["auth", "2fa"] as const,
   mailSettings: ["mail-settings"] as const,
   emails: {
     all: ["emails"] as const,

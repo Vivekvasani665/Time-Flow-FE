@@ -60,8 +60,43 @@ export type AuthUser = {
   role: RoleRef;
   permissions: string[];
   preferences: Preferences;
+  /** Whether sign-in asks for an authenticator-app code after the password. */
+  twoFactorEnabled: boolean;
   lastLoginAt: string | null;
   createdAt: string;
+};
+
+export type Passkey = {
+  id: string;
+  name: string;
+  /** Synced across devices (iCloud Keychain, Google Password Manager). */
+  backedUp: boolean;
+  createdAt: string;
+  lastUsedAt: string | null;
+};
+
+/** 2FA is on when the account has an authenticator app and/or at least one passkey. */
+export type TwoFactorStatus = {
+  enabled: boolean;
+  enabledAt: string | null;
+  /** Unused recovery codes; 0 while 2FA is off. */
+  recoveryCodesRemaining: number;
+  totp: {
+    enabled: boolean;
+    /** Setup started, not confirmed: finished here or on the login page at next sign-in. */
+    pending: boolean;
+  };
+  passkeys: Passkey[];
+};
+
+export type TwoFactorMethod = "totp" | "passkey" | "recovery";
+
+/** Started, not yet confirmed: the app must prove it has the secret before 2FA turns on. */
+export type TwoFactorSetup = {
+  /** Base32 key for typing in by hand when the QR code can't be scanned. */
+  secret: string;
+  otpauthUrl: string;
+  qrCodeDataUrl: string;
 };
 
 export type UserRef = {

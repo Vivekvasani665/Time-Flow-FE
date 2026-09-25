@@ -10,12 +10,14 @@ import { toast } from "sonner";
 import { SESSION_EXPIRED_REASON } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query-keys";
 import { cn, fullName } from "@/lib/utils";
-import { authService, type LoginOtpChallenge, type SignupOtpChallenge } from "@/services/auth.service";
+import { authService, type LoginOtpChallenge, type SignupOtpChallenge, type TwoFactorChallenge, type TwoFactorSetupChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
 import { LoginForm } from "./login-form";
 import { LoginOtpForm } from "./login-otp-form";
 import { SignupForm } from "./signup-form";
 import { SignupComplete, SignupOtpForm } from "./signup-otp-form";
+import { TwoFactorLoginForm } from "./two-factor-login-form";
+import { TwoFactorSetupLoginForm } from "./two-factor-setup-login-form";
 
 const handwriting = Caveat({ subsets: ["latin"], weight: ["500"], display: "swap" });
 
@@ -43,6 +45,18 @@ const SIGNUP_OTP_COPY: Copy = {
 const OTP_COPY: Copy = {
   title: "Verify your account",
   subtitle: "Your password was accepted. Enter the verification code we just sent to finish signing in.",
+};
+
+/** Shown while a password-verified login waits for its second factor. */
+const TWO_FACTOR_COPY: Copy = {
+  title: "Verify your identity",
+  subtitle: "Confirm it's you with your passkey or authenticator app.",
+};
+
+/** Shown when the user started an authenticator setup in Settings and signs in before finishing it. */
+const TWO_FACTOR_SETUP_COPY: Copy = {
+  title: "Finish setting up two-factor authentication",
+  subtitle: "You turned on two-factor authentication. Scan the QR code to finish — you'll only need to do this once.",
 };
 
 const FEATURES = [
@@ -164,6 +178,10 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
   // Set when the API asks for an emailed code; the card then shows that step
   // instead of the password form. No session exists while this is non-null.
   const [otpChallenge, setOtpChallenge] = useState<LoginOtpChallenge | null>(null);
+  // Same idea for an account with an authenticator app. Held in memory only, so a
+  // reload drops it and the user signs in again — the challenge is never stored.
+  const [twoFactorChallenge, setTwoFactorChallenge] = useState<TwoFactorChallenge | null>(null);
+  const [setupChallenge, setSetupChallenge] = useState<TwoFactorSetupChallenge | null>(null);
   // Sign-up runs form → code → done on this one page; no session exists at any step.
   const [signupChallenge, setSignupChallenge] = useState<SignupOtpChallenge | null>(null);
   const [signupDone, setSignupDone] = useState(false);
@@ -203,11 +221,13 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
   const signupHref = `/signup${rawNext ? `?next=${encodeURIComponent(rawNext)}` : ""}`;
 
   const awaitingOtp = mode === "login" && otpChallenge !== null;
+  const awaitingTwoFactor = mode === "login" && twoFactorChallenge !== null;
+  const finishingSetup = mode === "login" && setupChallenge !== null;
   const verifyingSignup = mode === "signup" && signupChallenge !== null;
   const signupComplete = mode === "signup" && signupDone;
   // Mid-code or finished, switching tabs would abandon the step in progress.
-  const midFlow = awaitingOtp || verifyingSignup || signupComplete;
-  const copy = awaitingOtp ? OTP_COPY : verifyingSignup ? SIGNUP_OTP_COPY : COPY[mode];
+  const midFlow = awaitingOtp || awaitingTwoFactor || finishingSetup || verifyingSignup || signupComplete;
+  const copy = finishingSetup ? TWO_FACTOR_SETUP_COPY : awaitingTwoFactor ? TWO_FACTOR_COPY : awaitingOtp ? OTP_COPY : verifyingSignup ? SIGNUP_OTP_COPY : COPY[mode];
 
   return (
     <div className="grid min-h-dvh bg-void lg:grid-cols-[1.15fr_1fr]">
@@ -289,7 +309,7 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
                 <p className="mt-2 mb-8 text-ink-mute">{copy.subtitle}</p>
               </>
             )}
-            {mode === "login" && !awaitingOtp && params.get("reason") === SESSION_EXPIRED_REASON && (
+            {mode === "login" && !midFlow && params.get("reason") === SESSION_EXPIRED_REASON && (
               <div role="status" className="mb-6 flex items-start gap-3 rounded-lg border border-amber/30 bg-amber/10 px-3.5 py-3 text-sm text-ink animate-fade-up">
                 <Clock className="mt-0.5 size-4 shrink-0 text-amber" aria-hidden="true" />
                 <span>
@@ -311,10 +331,14 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
                   <SignupOtpForm challenge={signupChallenge} onSuccess={handleSignupVerified} onCancel={() => setSignupChallenge(null)} />
                 )
               )
+            ) : finishingSetup ? (
+              <TwoFactorSetupLoginForm challenge={setupChallenge} onSuccess={handleSuccess} onCancel={() => setSetupChallenge(null)} />
+            ) : awaitingTwoFactor ? (
+              <TwoFactorLoginForm challenge={twoFactorChallenge} onSuccess={handleSuccess} onCancel={() => setTwoFactorChallenge(null)} />
             ) : awaitingOtp ? (
               <LoginOtpForm challenge={otpChallenge} onSuccess={handleSuccess} onCancel={() => setOtpChallenge(null)} />
             ) : (
-              <LoginForm onSuccess={handleSuccess} onOtpRequired={setOtpChallenge} />
+              <LoginForm onSuccess={handleSuccess} onOtpRequired={setOtpChallenge} onTwoFactorRequired={setTwoFactorChallenge} onTwoFactorSetupRequired={setSetupChallenge} />
             )}
             {!midFlow && (
               <p className="mt-6 border-t border-line pt-5 text-center text-sm text-ink-mute">
