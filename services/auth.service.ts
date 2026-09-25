@@ -72,12 +72,32 @@ export type LoginOtpChallenge = {
   delivery?: OtpDelivery;
   emailSent?: boolean;
   smsSent?: boolean;
+  /** False when the SMS carries its own code (Twilio Verify): the two messages hold different codes, either works. */
+  sameCodeOnAllChannels?: boolean;
   expiresAt: string;
   resendAvailableAt: string;
   /** Relative twins of the dates above, so a client with a skewed clock still counts down correctly. */
   expiresInSeconds: number;
   resendAvailableInSeconds: number;
 };
+
+/** Passwordless sign-in: the account is found by exactly one of these. */
+export type SendOtpInput = { email: string } | { phone: string };
+
+/** `/auth/send-otp` and `/auth/resend-otp`: the challenge, keyed by an opaque token instead of a verificationId. */
+type OtpLoginResponse = Omit<LoginOtpChallenge, "requiresOtp" | "verificationId" | "expiresAt" | "resendAvailableAt"> & { token: string };
+
+/**
+ * The token plays the verificationId's part, so the passwordless flow reuses the
+ * code screen as is. Deadlines are local, from the API's relative seconds.
+ */
+const toOtpLoginChallenge = ({ token, ...rest }: OtpLoginResponse): LoginOtpChallenge => ({
+  ...rest,
+  requiresOtp: true,
+  verificationId: token,
+  expiresAt: inSeconds(rest.expiresInSeconds),
+  resendAvailableAt: inSeconds(rest.resendAvailableInSeconds),
+});
 
 /** Accounts with an authenticator app take this branch instead of the emailed code. */
 export type TwoFactorChallenge = {
@@ -121,6 +141,21 @@ export const authService = {
     });
     return { requiresOtp: true, ...data };
   },
+
+  /** Passwordless sign-in, step 1: sends one code by email and SMS and returns the token to verify it with. */
+  sendOtp: async (input: SendOtpInput): Promise<LoginOtpChallenge> =>
+    toOtpLoginChallenge((await request<OtpLoginResponse>("/auth/send-otp", { method: "POST", body: input, skipAuthRefresh: true })).data),
+
+  /** Step 2: token + code. Signs in — or, for an account with an authenticator app, asks for that code next. */
+  verifyOtp: async (input: { token: string; otp: string }): Promise<{ signedIn: true; user: AuthUser } | TwoFactorChallenge> => {
+    const { data } = await request<{ user: AuthUser } | TwoFactorChallenge>("/auth/verify-otp", { method: "POST", body: input, skipAuthRefresh: true });
+    if ("twoFactorRequired" in data && data.twoFactorRequired) return data;
+    return { signedIn: true, user: (data as { user: AuthUser }).user };
+  },
+
+  /** A new code on the same token; the previous one stops working. */
+  resendOtp: async (token: string, channel: OtpChannel | "both" = "both"): Promise<LoginOtpChallenge> =>
+    toOtpLoginChallenge((await request<OtpLoginResponse>("/auth/resend-otp", { method: "POST", body: { token, channel }, skipAuthRefresh: true })).data),
 
   register: async (input: RegisterInput): Promise<SignupOtpChallenge> =>
     toSignupChallenge((await request<SignupOtpResponse>("/auth/register", { method: "POST", body: input, skipAuthRefresh: true })).data),
