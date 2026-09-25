@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
-// Rewrites are fixed at build time. On a hosted build (Vercel, Netlify) a missing
+// Rewrites are fixed at build time. On a hosted build (Vercel, Netlify, Render) a missing
 // value would silently proxy every API call to localhost, so fail the build instead.
-if ((process.env.VERCEL || process.env.NETLIFY) && !process.env.BACKEND_INTERNAL_URL) {
+if ((process.env.VERCEL || process.env.NETLIFY || process.env.RENDER) && !process.env.BACKEND_INTERNAL_URL) {
   throw new Error("BACKEND_INTERNAL_URL must be set to the public API URL (e.g. https://api.example.com).");
 }
 const backend = (process.env.BACKEND_INTERNAL_URL ?? "http://localhost:4000").replace(/\/+$/, "");
