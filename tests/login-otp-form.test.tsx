@@ -184,3 +184,17 @@ describe("LoginOtpForm", () => {
     expect(onCancel).toHaveBeenCalled();
   });
 });
+
+describe("LoginOtpForm with Twilio Verify", () => {
+  it("says the email and SMS codes differ when the API reports it", () => {
+    renderForm(
+      makeChallenge({
+        phone: "+91******6141",
+        channels: ["email", "sms"],
+        delivery: { email: { status: "sent" }, sms: { status: "sent" } },
+        sameCodeOnAllChannels: false,
+      }),
+    );
+    expect(screen.getByText(/each have their own code/i)).toBeInTheDocument();
+  });
+});

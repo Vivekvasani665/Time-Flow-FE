@@ -1,20 +1,19 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { BarChart3, CalendarDays, Check, Clock, KeyRound, Mail, MessageSquareText, SquareCheckBig, Users } from "lucide-react";
+import { BarChart3, CalendarDays, Check, Clock, Mail, SquareCheckBig, Users } from "lucide-react";
 import { Caveat } from "next/font/google";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ApiError, SESSION_EXPIRED_REASON } from "@/lib/api/client";
+import { SESSION_EXPIRED_REASON } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query-keys";
 import { cn, fullName } from "@/lib/utils";
 import { authService, type LoginOtpChallenge, type SignupOtpChallenge } from "@/services/auth.service";
 import type { AuthUser } from "@/types/api";
 import { LoginForm } from "./login-form";
 import { LoginOtpForm } from "./login-otp-form";
-import { OtpLoginRequestForm } from "./otp-login-request-form";
 import { SignupForm } from "./signup-form";
 import { SignupComplete, SignupOtpForm } from "./signup-otp-form";
 
@@ -45,30 +44,6 @@ const OTP_COPY: Copy = {
   title: "Verify your account",
   subtitle: "Your password was accepted. Enter the verification code we just sent to finish signing in.",
 };
-
-/** Passwordless sign-in: asking for the code, then entering it. */
-const OTP_LOGIN_REQUEST_COPY: Copy = {
-  title: "Sign in with OTP",
-  subtitle: "No password needed. We'll send a one-time code to your email and mobile number.",
-};
-
-const OTP_LOGIN_VERIFY_COPY: Copy = {
-  title: "Enter your code",
-  subtitle: "Enter the one-time code we just sent to finish signing in.",
-};
-
-/**
- * Passwordless sign-in, last step. Accounts with an authenticator app get a 2FA
- * challenge instead of a session, which this UI cannot finish yet — so that is
- * raised as an error the code screen shows, rather than a navigation with no session.
- */
-async function verifyOtpLogin(token: string, otp: string): Promise<AuthUser> {
-  const result = await authService.verifyOtp({ token, otp });
-  if ("twoFactorRequired" in result) {
-    throw new ApiError(403, "TWO_FACTOR_UNSUPPORTED", "This account uses an authenticator app, which is not supported here yet.");
-  }
-  return result.user;
-}
 
 const FEATURES = [
   { icon: Users, title: "Role-based access control", body: "Keep your team secure and organized.", tone: "text-blue bg-blue/10" },
@@ -192,9 +167,6 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
   // Sign-up runs form → code → done on this one page; no session exists at any step.
   const [signupChallenge, setSignupChallenge] = useState<SignupOtpChallenge | null>(null);
   const [signupDone, setSignupDone] = useState(false);
-  // Passwordless sign-in: which form the login card shows, and the token + code step once a code is out.
-  const [loginMethod, setLoginMethod] = useState<"password" | "otp">("password");
-  const [otpLoginChallenge, setOtpLoginChallenge] = useState<LoginOtpChallenge | null>(null);
 
   // Already signed in (or refreshable)? Skip the login screen.
   useEffect(() => {
@@ -231,21 +203,11 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
   const signupHref = `/signup${rawNext ? `?next=${encodeURIComponent(rawNext)}` : ""}`;
 
   const awaitingOtp = mode === "login" && otpChallenge !== null;
-  const otpLoginRequest = mode === "login" && loginMethod === "otp" && otpLoginChallenge === null;
-  const otpLoginVerify = mode === "login" && loginMethod === "otp" && otpLoginChallenge !== null;
   const verifyingSignup = mode === "signup" && signupChallenge !== null;
   const signupComplete = mode === "signup" && signupDone;
   // Mid-code or finished, switching tabs would abandon the step in progress.
-  const midFlow = awaitingOtp || otpLoginVerify || verifyingSignup || signupComplete;
-  const copy = awaitingOtp
-    ? OTP_COPY
-    : otpLoginVerify
-      ? OTP_LOGIN_VERIFY_COPY
-      : otpLoginRequest
-        ? OTP_LOGIN_REQUEST_COPY
-        : verifyingSignup
-          ? SIGNUP_OTP_COPY
-          : COPY[mode];
+  const midFlow = awaitingOtp || verifyingSignup || signupComplete;
+  const copy = awaitingOtp ? OTP_COPY : verifyingSignup ? SIGNUP_OTP_COPY : COPY[mode];
 
   return (
     <div className="grid min-h-dvh bg-void lg:grid-cols-[1.15fr_1fr]">
@@ -327,7 +289,7 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
                 <p className="mt-2 mb-8 text-ink-mute">{copy.subtitle}</p>
               </>
             )}
-            {mode === "login" && !awaitingOtp && !otpLoginVerify && params.get("reason") === SESSION_EXPIRED_REASON && (
+            {mode === "login" && !awaitingOtp && params.get("reason") === SESSION_EXPIRED_REASON && (
               <div role="status" className="mb-6 flex items-start gap-3 rounded-lg border border-amber/30 bg-amber/10 px-3.5 py-3 text-sm text-ink animate-fade-up">
                 <Clock className="mt-0.5 size-4 shrink-0 text-amber" aria-hidden="true" />
                 <span>
@@ -351,38 +313,8 @@ export function LoginScreen({ hasSession = true, mode = "login" }: { hasSession?
               )
             ) : awaitingOtp ? (
               <LoginOtpForm challenge={otpChallenge} onSuccess={handleSuccess} onCancel={() => setOtpChallenge(null)} />
-            ) : otpLoginVerify ? (
-              <LoginOtpForm
-                challenge={otpLoginChallenge}
-                onSuccess={handleSuccess}
-                onCancel={() => setOtpLoginChallenge(null)}
-                verifyCode={verifyOtpLogin}
-                resendCode={(token) => authService.resendOtp(token)}
-                cancelLabel="Use a different email or number"
-              />
-            ) : otpLoginRequest ? (
-              <OtpLoginRequestForm onSent={setOtpLoginChallenge} />
             ) : (
               <LoginForm onSuccess={handleSuccess} onOtpRequired={setOtpChallenge} />
-            )}
-            {mode === "login" && !midFlow && (
-              <button
-                type="button"
-                onClick={() => setLoginMethod((m) => (m === "otp" ? "password" : "otp"))}
-                className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-line bg-panel text-sm font-medium text-ink transition hover:border-cyan/40 hover:bg-panel-2"
-              >
-                {loginMethod === "otp" ? (
-                  <>
-                    <KeyRound className="size-4 text-cyan" aria-hidden="true" />
-                    Sign in with password instead
-                  </>
-                ) : (
-                  <>
-                    <MessageSquareText className="size-4 text-cyan" aria-hidden="true" />
-                    Sign in with OTP instead
-                  </>
-                )}
-              </button>
             )}
             {!midFlow && (
               <p className="mt-6 border-t border-line pt-5 text-center text-sm text-ink-mute">

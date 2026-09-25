@@ -16,8 +16,8 @@ import type { AuthUser } from "@/types/api";
 
 /** Mobile numbers are sent with their country code; spaces, dashes and brackets are dropped. */
 const MOBILE_RULE = /^\+[1-9]\d{7,14}$/;
-export const normalizeMobile = (value: string) => value.replace(/[\s()-]/g, "");
-export const isEmailLike = (value: string) => value.includes("@");
+const normalizeMobile = (value: string) => value.replace(/[\s()-]/g, "");
+const isEmailLike = (value: string) => value.includes("@");
 
 export const loginSchema = z.object({
   identifier: z

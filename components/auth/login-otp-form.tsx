@@ -21,24 +21,17 @@ function describeError(error: unknown): string {
     // Signing in again replaces the previous code, so a rejected code is most
     // often a correct one read out of an older message.
     case "LOGIN_OTP_INVALID":
-    case "INVALID_OTP":
       return `${error.message} Use the code from the newest email or SMS — earlier ones stop working.`;
     // The API counts down the remaining attempts in its own message, so it is
     // more informative here than anything we could write.
     case "LOGIN_OTP_TOO_MANY_ATTEMPTS":
     case "LOGIN_OTP_RESEND_COOLDOWN":
     case "LOGIN_OTP_RESEND_LIMIT":
-    case "OTP_MAX_ATTEMPTS":
-    case "OTP_RATE_LIMITED":
       return error.message;
     case "LOGIN_OTP_EXPIRED":
-    case "OTP_EXPIRED":
       return "That code has expired. Request a new one below.";
     case "LOGIN_OTP_SESSION_INVALID":
-    case "OTP_TOKEN_INVALID":
       return "This sign-in attempt is no longer valid. Go back and sign in again.";
-    case "TWO_FACTOR_UNSUPPORTED":
-      return "This account uses an authenticator app, which is not supported here yet. Sign in with your password instead.";
     // Neither channel got the code; `details` names each failure when the API lists them.
     case "EMAIL_DELIVERY_FAILED":
     case "OTP_DELIVERY_FAILED": {
@@ -93,17 +86,10 @@ export function LoginOtpForm({
   challenge: initialChallenge,
   onSuccess,
   onCancel,
-  verifyCode = (verificationId, otp) => authService.verifyLoginOtp({ verificationId, otp }),
-  resendCode = (verificationId) => authService.resendLoginOtp(verificationId),
-  cancelLabel = "Use a different account",
 }: {
   challenge: LoginOtpChallenge;
   onSuccess: (user: AuthUser) => void;
   onCancel: () => void;
-  /** Defaults to the password sign-in's code check; the passwordless flow passes its own (token + code). */
-  verifyCode?: (verificationId: string, otp: string) => Promise<AuthUser>;
-  resendCode?: (verificationId: string) => Promise<LoginOtpChallenge>;
-  cancelLabel?: string;
 }) {
   const [challenge, setChallenge] = useState(initialChallenge);
   const [code, setCode] = useState("");
@@ -127,7 +113,7 @@ export function LoginOtpForm({
     setNotice(null);
     setVerifying(true);
     try {
-      onSuccess(await verifyCode(challenge.verificationId, value));
+      onSuccess(await authService.verifyLoginOtp({ verificationId: challenge.verificationId, otp: value }));
     } catch (error) {
       setFormError(describeError(error));
       setCode("");
@@ -151,7 +137,7 @@ export function LoginOtpForm({
     setNotice(null);
     setResending(true);
     try {
-      const next = await resendCode(challenge.verificationId);
+      const next = await authService.resendLoginOtp(challenge.verificationId);
       setChallenge(next);
       setCode("");
       setNotice(`A new code was sent to ${channelPhrase(reachedChannels(next.channels, next.delivery))}. Earlier codes no longer work.`);
@@ -254,7 +240,7 @@ export function LoginOtpForm({
           </Button>
         </p>
         <Button variant="ghost" onClick={onCancel} icon={<ArrowLeft className="size-4" aria-hidden="true" />}>
-          {cancelLabel}
+          Use a different account
         </Button>
       </div>
 
