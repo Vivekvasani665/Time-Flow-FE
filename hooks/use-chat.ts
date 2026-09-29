@@ -1,8 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Socket } from "socket.io-client";
 import { useAuth } from "@/components/auth/auth-provider";
 import { ApiError, isApiError } from "@/lib/api/errors";
@@ -33,6 +32,25 @@ import type {
 import { useChatSocket } from "./use-chat-socket";
 
 export const CHAT_PATH = "/chat";
+
+// Whether Global Chat is on screen in this tab: its messages are being read, so they aren't unread.
+let liveChatViewers = 0;
+const liveChatListeners = new Set<() => void>();
+const liveChatViewing = {
+  enter() {
+    liveChatViewers += 1;
+    for (const l of liveChatListeners) l();
+  },
+  leave() {
+    liveChatViewers = Math.max(0, liveChatViewers - 1);
+    for (const l of liveChatListeners) l();
+  },
+  subscribe(listener: () => void) {
+    liveChatListeners.add(listener);
+    return () => liveChatListeners.delete(listener);
+  },
+  get: () => liveChatViewers > 0,
+};
 const PAGE_SIZE = 50;
 const ACK_TIMEOUT_MS = 10_000;
 /** A typing indicator nobody refreshed within this long is assumed stale (a lost "stop"). */
@@ -81,6 +99,17 @@ export function useChat() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [online, setOnline] = useState<ChatUser[]>([]);
   const [typingUsers, setTypingUsers] = useState<ChatUser[]>([]);
+
+  // Where "New messages" starts: the read position from before this visit.
+  const [unreadSince] = useState<string | null>(() => {
+    const unread = qc.getQueryData<ChatUnread>(queryKeys.chat.unread);
+    return unread && unread.count > 0 ? (unread.lastReadAt ?? new Date(0).toISOString()) : null;
+  });
+
+  useEffect(() => {
+    liveChatViewing.enter();
+    return () => liveChatViewing.leave();
+  }, []);
 
   const payloads = useRef(new Map<string, SendPayload>());
   const typingTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -338,6 +367,7 @@ export function useChat() {
 
   return {
     me,
+    unreadSince,
     messages: timeline.messages,
     hasMore: timeline.hasMore,
     status,
@@ -360,14 +390,13 @@ export function useChat() {
 }
 
 /**
- * Unread count for the sidebar badge. Counts up live from the shared socket
- * and is cleared when the chat is opened (in this tab or any other).
+ * Unread count of Global Chat (# General), for badges. Counts up live from the
+ * shared socket and is cleared when it is opened (in this tab or any other).
  */
 export function useChatUnread(): number {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const pathname = usePathname();
-  const onChatPage = pathname === CHAT_PATH;
+  const viewing = useSyncExternalStore(liveChatViewing.subscribe, liveChatViewing.get, () => false);
   const { socket } = useChatSocket(Boolean(user));
 
   const query = useQuery({
@@ -377,13 +406,13 @@ export function useChatUnread(): number {
     refetchInterval: 60_000,
   });
 
-  const onChatPageRef = useRef(onChatPage);
-  onChatPageRef.current = onChatPage;
+  const viewingRef = useRef(viewing);
+  viewingRef.current = viewing;
 
   useEffect(() => {
     if (!socket || !user) return;
     const onMessage = (message: ChatMessage) => {
-      if (message.sender.id === user.id || onChatPageRef.current) return;
+      if (message.sender.id === user.id || viewingRef.current) return;
       qc.setQueryData<ChatUnread>(queryKeys.chat.unread, (prev) => ({
         count: Math.min((prev?.count ?? 0) + 1, 100),
         lastReadAt: prev?.lastReadAt ?? null,
@@ -404,6 +433,6 @@ export function useChatUnread(): number {
     };
   }, [socket, user, qc]);
 
-  return useMemo(() => (onChatPage ? 0 : (query.data?.count ?? 0)), [onChatPage, query.data]);
+  return useMemo(() => (viewing ? 0 : (query.data?.count ?? 0)), [viewing, query.data]);
 }
 

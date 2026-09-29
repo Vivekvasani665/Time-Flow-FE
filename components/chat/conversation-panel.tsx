@@ -1,22 +1,43 @@
 "use client";
 
-import { LogIn, WifiOff } from "lucide-react";
-import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { usePermissions } from "@/components/auth/auth-provider";
-import { buttonClasses } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ErrorState } from "@/components/ui/states";
-import { CHAT_PATH, useChat } from "@/hooks/use-chat";
+import { EmptyState, ErrorState } from "@/components/ui/states";
 import { cn } from "@/lib/utils";
-import type { ChatMessageView } from "@/types/chat";
-import { ChatEmptyState } from "./chat-empty-state";
-import { ChatHeader } from "./chat-header";
+import type { ChatMessageView, ChatUser } from "@/types/chat";
+import { Button } from "@/components/ui/button";
+import { MessagesSquare } from "lucide-react";
 import { ChatInput } from "./chat-input";
 import { ChatMessageList } from "./chat-message-list";
 import { ChatTypingIndicator } from "./chat-typing-indicator";
+
+/**
+ * What a conversation needs to be shown and used. `useChat` provides it for
+ * the live Global Chat; the workspace provides it for mock conversations — and
+ * later for every conversation, from the API.
+ */
+export type ConversationController = {
+  me: string | null;
+  messages: ChatMessageView[];
+  status: "loading" | "ready" | "error";
+  loadError?: unknown;
+  retryLoad?: () => unknown;
+  hasMore: boolean;
+  loadingOlder: boolean;
+  loadOlder: () => void;
+  typingUsers: ChatUser[];
+  canModerate: boolean;
+  sendMessage: (content: string, replyTo: ChatMessageView | null) => void;
+  editMessage: (id: string, content: string) => Promise<boolean>;
+  deleteMessage: (id: string) => Promise<boolean>;
+  toggleReaction: (message: ChatMessageView, emoji: string) => void;
+  retryMessage: (clientId: string) => void;
+  discardMessage: (clientId: string) => void;
+  startTyping: () => void;
+  stopTyping: () => void;
+};
 
 function MessagesSkeleton() {
   return (
@@ -31,9 +52,29 @@ function MessagesSkeleton() {
   );
 }
 
-export function ChatLayout() {
-  const chat = useChat();
-  const { can } = usePermissions();
+type ConversationPanelProps = {
+  controller: ConversationController;
+  /** Composer placeholder, e.g. "Message #General". */
+  placeholder: string;
+  beginningLabel: string;
+  emptyTitle: string;
+  emptyDescription: string;
+  newSince?: string | null;
+  focusId?: string | null;
+  /** Status banners (connection lost, signed out) under the header. */
+  banner?: ReactNode;
+};
+
+export function ConversationPanel({
+  controller: chat,
+  placeholder,
+  beginningLabel,
+  emptyTitle,
+  emptyDescription,
+  newSince,
+  focusId,
+  banner,
+}: ConversationPanelProps) {
   const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
   const [editing, setEditing] = useState<ChatMessageView | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ChatMessageView | null>(null);
@@ -75,52 +116,50 @@ export function ChatLayout() {
   };
 
   return (
-    <div className="hud-panel clip-corner flex h-[calc(100dvh-7rem)] min-h-[26rem] flex-col lg:h-[calc(100dvh-8rem)]">
-      <ChatHeader online={chat.online} connection={chat.connection} me={chat.me} />
-
-      {chat.connection === "reconnecting" && (
-        <div className="flex items-center gap-2 border-b border-amber/25 bg-amber/10 px-4 py-2 text-sm text-amber sm:px-5" role="status">
-          <WifiOff className="size-4 shrink-0" aria-hidden="true" />
-          <span>
-            <span className="font-semibold">Connection lost.</span> We&apos;re trying to reconnect — messages you send will still go through.
-          </span>
-        </div>
-      )}
-      {chat.connection === "unauthorized" && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-danger/25 bg-danger/10 px-4 py-2 text-sm text-danger sm:px-5" role="alert">
-          <LogIn className="size-4 shrink-0" aria-hidden="true" />
-          <span className="flex-1">Your session has expired. Please sign in again to continue chatting.</span>
-          <Link href={`/login?next=${encodeURIComponent(CHAT_PATH)}`} className={buttonClasses("secondary", "sm")}>
-            Sign in
-          </Link>
-        </div>
-      )}
+    <>
+      {banner}
 
       {chat.status === "loading" ? (
         <MessagesSkeleton />
       ) : chat.status === "error" ? (
-        <ErrorState className="flex-1" error={chat.loadError} title="Couldn't load the chat" onRetry={chat.retryLoad} />
+        <ErrorState className="flex-1" error={chat.loadError} title="Couldn't load this conversation" onRetry={chat.retryLoad} />
       ) : (
         <ChatMessageList
           messages={chat.messages}
           me={chat.me}
-          canModerate={can("chat.moderate")}
+          canModerate={chat.canModerate}
           hasMore={chat.hasMore}
           loadingOlder={chat.loadingOlder}
           onLoadOlder={chat.loadOlder}
+          beginningLabel={beginningLabel}
+          newSince={newSince}
+          focusId={focusId}
           onReply={onReply}
           onEdit={onEdit}
           onDelete={setPendingDelete}
           onReact={chat.toggleReaction}
           onRetry={chat.retryMessage}
           onDiscard={chat.discardMessage}
-          empty={<ChatEmptyState onStart={() => inputRef.current?.focus()} />}
+          empty={
+            <EmptyState
+              className="h-full"
+              icon={<MessagesSquare />}
+              title={emptyTitle}
+              description={emptyDescription}
+              action={
+                <Button size="sm" onClick={() => inputRef.current?.focus()}>
+                  Send a message
+                </Button>
+              }
+            />
+          }
         />
       )}
 
       <ChatTypingIndicator users={chat.typingUsers} />
       <ChatInput
         textareaRef={inputRef}
+        placeholder={placeholder}
         replyingTo={replyingTo}
         editing={editing}
         onCancelContext={cancelContext}
@@ -128,6 +167,7 @@ export function ChatLayout() {
         onSaveEdit={onSaveEdit}
         onTypingStart={chat.startTyping}
         onTypingStop={chat.stopTyping}
+        onAttach={() => toast("File sharing is coming soon", { description: "You'll be able to attach files to messages here." })}
       />
 
       <ConfirmDialog
@@ -136,13 +176,13 @@ export function ChatLayout() {
         title="Delete this message?"
         description={
           pendingDelete && pendingDelete.sender.id !== chat.me
-            ? "It will be removed for everyone in Global Chat. This can't be undone."
+            ? "It will be removed for everyone in this conversation. This can't be undone."
             : "It will be replaced with “This message was deleted.” for everyone. This can't be undone."
         }
         confirmLabel="Delete"
         loading={deleting}
         onConfirm={() => void confirmDelete()}
       />
-    </div>
+    </>
   );
 }

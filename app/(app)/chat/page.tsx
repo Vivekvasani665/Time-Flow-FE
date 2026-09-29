@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
-import { ChatLayout } from "@/components/chat/chat-layout";
+import { Suspense } from "react";
+import { ChatPage } from "@/components/chat/chat-page";
 
-export const metadata: Metadata = { title: "Global Chat" };
+export const metadata: Metadata = { title: "Chat" };
 
 /** Open to every signed-in user; the API enforces who may edit or delete what. */
-export default function ChatPage() {
-  return <ChatLayout />;
+export default function Page() {
+  return (
+    <Suspense>
+      <ChatPage />
+    </Suspense>
+  );
 }

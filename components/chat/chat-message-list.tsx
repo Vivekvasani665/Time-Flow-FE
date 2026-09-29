@@ -33,9 +33,27 @@ type ChatMessageListProps = Omit<ChatMessageHandlers, "onJumpTo"> & {
   loadingOlder: boolean;
   onLoadOlder: () => void;
   empty: ReactNode;
+  /** Shown above the oldest message once the whole history is loaded. */
+  beginningLabel: string;
+  /** Messages from others after this time get a "New messages" divider before the first of them. */
+  newSince?: string | null;
+  /** Scrolled to and highlighted when set (e.g. opened from a search result). */
+  focusId?: string | null;
 };
 
-export function ChatMessageList({ messages, me, canModerate, hasMore, loadingOlder, onLoadOlder, empty, ...handlers }: ChatMessageListProps) {
+export function ChatMessageList({
+  messages,
+  me,
+  canModerate,
+  hasMore,
+  loadingOlder,
+  onLoadOlder,
+  empty,
+  beginningLabel,
+  newSince = null,
+  focusId = null,
+  ...handlers
+}: ChatMessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const firstId = useRef<string | undefined>(undefined);
@@ -64,7 +82,12 @@ export function ChatMessageList({ messages, me, canModerate, hasMore, loadingOld
       el.scrollTop += el.scrollHeight - scrollHeight.current;
     } else if (last && last.id !== lastId.current) {
       const opening = lastId.current === undefined;
-      if (opening || atBottom.current || last.sender.id === me) scrollToBottom();
+      const divider = opening ? el.querySelector<HTMLElement>("[data-new-divider]") : null;
+      if (divider) {
+        // Open where the unread part starts, not below it.
+        el.scrollTop = divider.offsetTop - 16;
+        atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
+      } else if (opening || atBottom.current || last.sender.id === me) scrollToBottom();
       else setUnseen((n) => n + 1);
     }
     firstId.current = first;
@@ -89,6 +112,11 @@ export function ChatMessageList({ messages, me, canModerate, hasMore, loadingOld
     }
   };
 
+  // Computed once per list: the divider stays put while new messages arrive.
+  const [firstNewId] = useState(() =>
+    newSince ? (messages.find((m) => m.sender.id !== me && m.createdAt > newSince)?.id ?? null) : null,
+  );
+
   const onJumpTo = useCallback((id: string) => {
     const target = document.getElementById(`chat-message-${id}`);
     if (!target) {
@@ -99,6 +127,12 @@ export function ChatMessageList({ messages, me, canModerate, hasMore, loadingOld
     setHighlightId(id);
     setTimeout(() => setHighlightId((current) => (current === id ? null : current)), 1_600);
   }, []);
+
+  useEffect(() => {
+    if (focusId && messages.some((m) => m.id === focusId)) onJumpTo(focusId);
+    // Only when asked to focus something new, not on every message.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -123,7 +157,7 @@ export function ChatMessageList({ messages, me, canModerate, hasMore, loadingOld
                   Load earlier messages
                 </button>
               ) : (
-                <span>This is the beginning of Global Chat.</span>
+                <span>{beginningLabel}</span>
               )}
             </div>
             {messages.map((message, i) => {
@@ -132,6 +166,13 @@ export function ChatMessageList({ messages, me, canModerate, hasMore, loadingOld
               const newDay = !previous || !sameDay(previous.createdAt, message.createdAt);
               return (
                 <Fragment key={message.id}>
+                  {message.id === firstNewId && (
+                    <div className="my-3 flex items-center gap-3 px-5" role="separator" data-new-divider>
+                      <span className="h-px flex-1 bg-danger/40" />
+                      <span className="text-[0.6875rem] font-semibold tracking-wide text-danger uppercase">New messages</span>
+                      <span className="h-px flex-1 bg-danger/40" />
+                    </div>
+                  )}
                   {newDay && (
                     <div className="my-4 flex items-center gap-3 px-5" role="separator">
                       <span className="h-px flex-1 bg-line" />

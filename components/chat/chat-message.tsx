@@ -1,7 +1,8 @@
 "use client";
 
-import { AlertCircle, Check, Clock, CornerUpLeft, MoreHorizontal, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { AlertCircle, Check, Clock, Copy, CornerUpLeft, MoreHorizontal, MoreVertical, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { memo, type ReactNode } from "react";
+import { toast } from "sonner";
 import { Avatar } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -212,6 +213,13 @@ function DeliveryStatus({ message, onRetry, onDiscard }: Pick<ChatMessageProps, 
   );
 }
 
+function copyText(message: ChatMessageView) {
+  navigator.clipboard
+    ?.writeText(message.content)
+    .then(() => toast.success("Copied to clipboard"))
+    .catch(() => toast.error("Couldn't copy the message"));
+}
+
 type MessageActionsProps = Pick<ChatMessageProps, "message" | "onReply" | "onEdit" | "onDelete" | "onReact"> & {
   mine: boolean;
   canEdit: boolean;
@@ -251,6 +259,16 @@ function MessageActions({ message, mine, canEdit, canDelete, onReply, onEdit, on
             <Trash2 className="size-4" />
           </button>
         )}
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger className={chatIconButton} aria-label="More actions" title="More">
+            <MoreVertical className="size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align={mine ? "end" : "start"}>
+            <DropdownMenuItem icon={<Copy />} onSelect={() => copyText(message)}>
+              Copy text
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <DropdownMenu modal={false}>
@@ -268,6 +286,9 @@ function MessageActions({ message, mine, canEdit, canDelete, onReply, onEdit, on
           <DropdownMenuSeparator />
           <DropdownMenuItem icon={<CornerUpLeft />} onSelect={() => onReply(message)}>
             Reply
+          </DropdownMenuItem>
+          <DropdownMenuItem icon={<Copy />} onSelect={() => copyText(message)}>
+            Copy text
           </DropdownMenuItem>
           {canEdit && (
             <DropdownMenuItem icon={<Pencil />} onSelect={() => onEdit(message)}>

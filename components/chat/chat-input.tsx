@@ -1,6 +1,6 @@
 "use client";
 
-import { SendHorizontal, Smile } from "lucide-react";
+import { Paperclip, SendHorizontal, Smile } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type Ref } from "react";
 import { cn } from "@/lib/utils";
 import { CHAT_MESSAGE_MAX_LENGTH, type ChatMessageView } from "@/types/chat";
@@ -24,9 +24,24 @@ type ChatInputProps = {
   onTypingStart: () => void;
   onTypingStop: () => void;
   textareaRef?: Ref<HTMLTextAreaElement>;
+  /** e.g. "Message #General". */
+  placeholder?: string;
+  /** Attach button; hidden when absent. */
+  onAttach?: () => void;
 };
 
-export function ChatInput({ replyingTo, editing, onCancelContext, onSend, onSaveEdit, onTypingStart, onTypingStop, textareaRef }: ChatInputProps) {
+export function ChatInput({
+  replyingTo,
+  editing,
+  onCancelContext,
+  onSend,
+  onSaveEdit,
+  onTypingStart,
+  onTypingStop,
+  textareaRef,
+  placeholder = "Type a message…",
+  onAttach,
+}: ChatInputProps) {
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -153,9 +168,20 @@ export function ChatInput({ replyingTo, editing, onCancelContext, onSend, onSave
           align="start"
           className="mb-0.5 size-9"
         />
+        {onAttach && (
+          <button
+            type="button"
+            onClick={onAttach}
+            className="mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-panel-3 hover:text-ink"
+            aria-label="Attach a file"
+            title="Attach a file"
+          >
+            <Paperclip className="size-5" />
+          </button>
+        )}
         <div className="min-w-0 flex-1">
           <label htmlFor="chat-input" className="sr-only">
-            Message Global Chat
+            {placeholder}
           </label>
           <textarea
             id="chat-input"
@@ -165,7 +191,7 @@ export function ChatInput({ replyingTo, editing, onCancelContext, onSend, onSave
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={onKeyDown}
             onBlur={stopTyping}
-            placeholder={editing ? "Edit your message…" : "Type a message…"}
+            placeholder={editing ? "Edit your message…" : placeholder}
             aria-invalid={tooLong || undefined}
             aria-describedby={tooLong ? "chat-input-error" : undefined}
             enterKeyHint="send"

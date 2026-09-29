@@ -72,3 +72,33 @@ export type ChatSocketError = {
 export type ChatAck<T> = { ok: true; data: T } | { ok: false; error: ChatSocketError };
 
 export type ChatConnectionState = "connecting" | "connected" | "reconnecting" | "unauthorized";
+
+// ── Conversations (channels & direct messages) ─────────────
+// Shaped like the future GET /api/chat/conversations response, so the mock
+// store can be swapped for the API without touching components.
+
+export type ChatPresence = "online" | "away" | "offline";
+
+/** A person you can message, with their presence. */
+export type ChatContact = ChatUser & { presence: ChatPresence };
+
+export type ChatConversationKind = "channel" | "direct";
+
+export type ChatConversation = {
+  id: string;
+  kind: ChatConversationKind;
+  /** Channel name ("General"), or the other person's full name for a DM. */
+  name: string;
+  description: string | null;
+  /** Channels only. */
+  visibility: "public" | "private" | null;
+  /** Direct messages only: who the conversation is with. */
+  contact: ChatContact | null;
+  unread: number;
+  muted: boolean;
+  lastMessage: { content: string; senderName: string; createdAt: string } | null;
+  /** Served by the real chat API and socket; everything else is local mock data for now. */
+  live: boolean;
+};
+
+export type CreateChannelInput = { name: string; description: string; visibility: "public" | "private" };
