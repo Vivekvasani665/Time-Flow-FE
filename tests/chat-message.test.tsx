@@ -37,6 +37,12 @@ describe("<ChatMessage>", () => {
     expect(document.querySelector("img[src=x]")).toBeNull();
   });
 
+  it("shows **bold** as bold text, not asterisks", () => {
+    renderMessage(message({ content: "Open the **Tasks** page" }));
+    expect(screen.getByText("Tasks").tagName).toBe("STRONG");
+    expect(screen.queryByText(/\*\*/)).not.toBeInTheDocument();
+  });
+
   it("links only http(s) URLs", () => {
     renderMessage(message({ content: "see https://example.com/a?b=1. and javascript:alert(1)" }));
     const link = screen.getByRole("link", { name: "https://example.com/a?b=1" });

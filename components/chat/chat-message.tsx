@@ -20,15 +20,22 @@ const timeFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2
 // Only http(s) links become anchors, so a `javascript:` URL stays inert text.
 const URL_PATTERN = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]!?])/g;
 
+const BOLD_PATTERN = /\*\*([^*\n]+)\*\*/g;
+
+/** `**bold**` (which the assistant sometimes writes) as <strong>; everything else as text. */
+function emphasize(text: string, key: string): ReactNode[] {
+  return text.split(BOLD_PATTERN).map((part, i) => (i % 2 === 1 ? <strong key={`${key}-${i}`}>{part}</strong> : part));
+}
+
 /** Message text as React nodes — escaped by React, never injected as HTML. */
 function linkify(text: string): ReactNode[] {
-  return text.split(URL_PATTERN).map((part, i) =>
+  return text.split(URL_PATTERN).flatMap((part, i) =>
     i % 2 === 1 ? (
       <a key={i} href={part} target="_blank" rel="noopener noreferrer nofollow" className="underline underline-offset-2 break-all">
         {part}
       </a>
     ) : (
-      part
+      emphasize(part, String(i))
     ),
   );
 }

@@ -151,7 +151,7 @@ export function AssistantConversation({ conversation, focusId, onBack, onSearch 
       <div className="flex items-center gap-2 border-b border-amber/25 bg-amber/10 px-4 py-2 text-sm text-amber" role="status">
         <Info className="size-4 shrink-0" aria-hidden="true" />
         <span>
-          <span className="font-semibold">The assistant isn&apos;t set up yet.</span> An administrator needs to add an Anthropic API key to the
+          <span className="font-semibold">The assistant isn&apos;t set up yet.</span> An administrator needs to add a Groq API key to the
           server.
         </span>
       </div>

@@ -15,7 +15,7 @@ vi.mock("@/services/chat.service", () => ({
 
 beforeEach(() => {
   sessionStorage.clear();
-  vi.mocked(assistantService.status).mockResolvedValue({ enabled: true, name: "TimeFlow Assistant", model: "claude-opus-5-5" });
+  vi.mocked(assistantService.status).mockResolvedValue({ enabled: true, name: "TimeFlow Assistant", model: "openai/gpt-oss-120b" });
 });
 
 function openAssistant() {
@@ -70,7 +70,7 @@ describe("TimeFlow Assistant", () => {
   });
 
   it("marks the question failed with a reason, and retries it", async () => {
-    vi.mocked(assistantService.status).mockResolvedValue({ enabled: false, name: "TimeFlow Assistant", model: "claude-opus-5-5" });
+    vi.mocked(assistantService.status).mockResolvedValue({ enabled: false, name: "TimeFlow Assistant", model: "openai/gpt-oss-120b" });
     vi.mocked(assistantService.chat).mockRejectedValueOnce(new ApiError(503, "ASSISTANT_DISABLED", "not set up"));
     const pane = openAssistant();
     expect(await pane.findByText(/isn't set up yet/)).toBeInTheDocument();
