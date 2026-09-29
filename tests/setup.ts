@@ -75,3 +75,21 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => false,
   }),
 });
+
+// ── socket.io-client ─────────────────────────────────────
+// Unit tests never open a real connection; the chat socket stays "connecting".
+vi.mock("socket.io-client", () => {
+  const socket = {
+    connected: false,
+    active: false,
+    io: { on: vi.fn(), off: vi.fn() },
+    on: vi.fn(),
+    off: vi.fn(),
+    emit: vi.fn(),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    removeAllListeners: vi.fn(),
+    timeout: () => ({ emitWithAck: vi.fn().mockRejectedValue(new Error("offline")) }),
+  };
+  return { io: vi.fn(() => socket) };
+});

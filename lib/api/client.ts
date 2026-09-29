@@ -96,7 +96,8 @@ function sessionNeedsRefresh() {
 // Single-flight refresh: concurrent callers share one refresh request.
 let refreshPromise: Promise<boolean> | null = null;
 
-function refreshSession(): Promise<boolean> {
+/** Rotates the session now. Resolves false when there is no session left to refresh. */
+export function refreshSession(): Promise<boolean> {
   refreshPromise ??= fetch(`${API_BASE}/auth/refresh`, { method: "POST", credentials: "include" })
     .then((res) => {
       if (res.ok) trackSessionExpiry(res);
