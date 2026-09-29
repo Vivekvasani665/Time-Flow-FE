@@ -76,9 +76,7 @@ function direct(contactId: string, unread = 0): ChatConversation {
 
 export const INITIAL_CONVERSATIONS: ChatConversation[] = [
   { ...channel(LIVE_CHANNEL_ID, "General", "Everyone in TimeFlow", "public"), live: true },
-  channel("channel-development", "Development", "Builds, reviews and releases", "public", 3),
   channel("channel-leave", "Leave Monitoring", "Leave requests and approvals", "private"),
-  channel("channel-project-alpha", "Project Alpha", "Project Alpha delivery team", "public", 1),
   direct("user-1", 2),
   direct("user-2"),
   direct("user-3"),
@@ -98,24 +96,10 @@ export function buildMockMessages(me: ChatUser): Record<string, ChatMessage[]> {
   const rachit = asUser(contact("user-5"));
 
   const all = [
-    // # Development — the last three are unread.
-    message("channel-development", priya, "Pushed the new filters on the Tasks page to staging.", at(1, 16, 5)),
-    message("channel-development", me, "Nice! I'll review it first thing tomorrow.", at(1, 16, 12)),
-    message("channel-development", amit, "Heads-up: the migration for reports runs tonight at 11 PM.", at(1, 18, 40), {
-      reactions: [{ emoji: "👍", count: 2, userIds: [priya.id, me.id] }],
-    }),
-    message("channel-development", samir, "Morning all. The API for project exports is completed successfully ✅", at(0, 9, 14)),
-    message("channel-development", rahul, "Tests are green on main. Can someone approve PR #214?", at(0, 9, 31)),
-    message("channel-development", priya, "On it — give me 10 minutes.", at(0, 9, 33)),
-
     // # Leave Monitoring
     message("channel-leave", rachit, "Reminder: submit next month's leave plans by Friday.", at(2, 11, 0)),
     message("channel-leave", amit, "Mine is in. Out on the 14th and 15th.", at(2, 11, 26)),
     message("channel-leave", me, "Approved, thanks Amit.", at(1, 10, 2)),
-
-    // # Project Alpha — one unread.
-    message("channel-project-alpha", me, "Kick-off notes are in the project description.", at(3, 15, 0)),
-    message("channel-project-alpha", samir, "Design review moved to Thursday 3 PM.", at(0, 8, 50)),
 
     // DMs
     message("dm-user-1", rahul, "Hey, how are you?", at(1, 19, 2)),
@@ -129,7 +113,7 @@ export function buildMockMessages(me: ChatUser): Record<string, ChatMessage[]> {
 
     message("dm-user-3", amit, "Sent you the leave report.", at(4, 17, 30)),
 
-    message("dm-user-4", samir, "Can you add me to Project Alpha?", at(0, 8, 58)),
+    message("dm-user-4", samir, "Can you add me to the Leave Monitoring channel?", at(0, 8, 58)),
 
     message("dm-user-5", me, "Thanks for covering the release yesterday!", at(2, 9, 0)),
     message("dm-user-5", rachit, "Anytime 🙌", at(2, 9, 20)),

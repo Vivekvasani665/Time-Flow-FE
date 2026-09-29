@@ -21,7 +21,8 @@ describe("Chat page", () => {
   it("lists channels and direct messages, with unread counts, and asks to pick a conversation", async () => {
     renderChat();
     expect(screen.getByText("Select a conversation")).toBeInTheDocument();
-    expect(sidebar().getByRole("button", { name: "Development channel, 3 unread" })).toBeInTheDocument();
+    expect(sidebar().getByRole("button", { name: "Leave Monitoring channel" })).toBeInTheDocument();
+    expect(sidebar().queryByRole("button", { name: /Development|Project Alpha/ })).not.toBeInTheDocument();
     expect(sidebar().getByRole("button", { name: "Rahul Sharma, 2 unread" })).toBeInTheDocument();
     // # General is the live Global Chat; its count comes from the API.
     expect(await sidebar().findByRole("button", { name: "General channel, 4 unread" })).toBeInTheDocument();
@@ -52,11 +53,11 @@ describe("Chat page", () => {
 
   it("searches people, channels and messages", () => {
     renderChat();
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search people or messages" }), { target: { value: "api" } });
-    const results = within(screen.getByRole("region", { name: "Search results for api" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search people or messages" }), { target: { value: "leave report" } });
+    const results = within(screen.getByRole("region", { name: "Search results for leave report" }));
     expect(results.getByText("Messages")).toBeInTheDocument();
-    fireEvent.click(results.getByRole("button", { name: /completed successfully/ }));
-    expect(routerMock.push).toHaveBeenCalledWith(expect.stringMatching(/^\/\?c=channel-development&m=mock-/), { scroll: false });
+    fireEvent.click(results.getByRole("button", { name: /Sent you the leave report/ }));
+    expect(routerMock.push).toHaveBeenCalledWith(expect.stringMatching(/^\/\?c=dm-user-3&m=mock-/), { scroll: false });
   });
 
   it("validates and creates a channel", async () => {
