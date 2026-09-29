@@ -76,7 +76,9 @@ describe("TimeFlow Assistant", () => {
     expect(await pane.findByText(/isn't set up yet/)).toBeInTheDocument();
 
     fireEvent.click(pane.getByRole("button", { name: "Summarize my active projects" }));
-    expect(await pane.findByText("Failed to send")).toHaveAttribute("title", "The assistant isn't set up yet.");
+    expect(await pane.findByText("Failed to send")).toBeInTheDocument();
+    // Once in the banner, once as the reason under the failed question.
+    expect(pane.getAllByText("The assistant isn't set up yet.")).toHaveLength(2);
 
     vi.mocked(assistantService.chat).mockImplementationOnce(async (_t, onEvent) => {
       onEvent({ type: "delta", text: "All on track." });

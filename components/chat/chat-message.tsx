@@ -188,6 +188,9 @@ export const ChatMessage = memo(function ChatMessage({
             {mine && <DeliveryStatus message={message} onRetry={onRetry} onDiscard={onDiscard} />}
           </div>
         )}
+        {message.status === "failed" && message.error && (
+          <p className={cn("mt-0.5 max-w-sm text-xs text-danger", mine && "text-right")}>{message.error}</p>
+        )}
       </div>
     </div>
   );
@@ -205,7 +208,7 @@ function DeliveryStatus({ message, onRetry, onDiscard }: Pick<ChatMessageProps, 
     return (
       <span className="inline-flex flex-wrap items-center gap-1.5 text-danger" role="alert">
         · <AlertCircle className="size-3" aria-hidden="true" />
-        <span title={message.error}>Failed to send</span>
+        <span>Failed to send</span>
         <button type="button" onClick={() => onRetry(message.id)} className="inline-flex items-center gap-0.5 font-semibold hover:underline">
           <RotateCcw className="size-3" aria-hidden="true" /> Retry
         </button>
