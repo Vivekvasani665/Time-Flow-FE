@@ -89,10 +89,42 @@ describe("api client errors", () => {
     expect(error.friendly.canRetry).toBe(true);
   });
 
-  it("handles a gateway page that is not JSON", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>Bad Gateway</html>", { status: 502 })));
-    const error = (await api.get("/dashboard").catch((e: unknown) => e)) as ApiError;
-    expect(error.friendly.title).toBe("Connection Problem");
+  it("handles a gateway page that is not JSON once retries run out", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response("<html>Bad Gateway</html>", { status: 502 })));
+      const pending = api.get("/dashboard").catch((e: unknown) => e);
+      await vi.runAllTimersAsync();
+      const error = (await pending) as ApiError;
+      expect(error.friendly.title).toBe("Connection Problem");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries while a sleeping backend wakes up", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(new Response("<html>Bad Gateway</html>", { status: 502 }))
+        .mockResolvedValueOnce(new Response("<html>Unavailable</html>", { status: 503 }))
+        .mockResolvedValueOnce(json(200, { success: true, data: { ok: true } }));
+      vi.stubGlobal("fetch", fetchMock);
+      const pending = api.post("/auth/login", { email: "a@b.c", password: "x" });
+      await vi.runAllTimersAsync();
+      expect((await pending).data).toEqual({ ok: true });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not retry a 502 the API itself returned as JSON", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json(502, { success: false, statusCode: 502, code: "UPSTREAM", message: "x" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await api.get("/dashboard").catch(() => undefined);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("maps a failed fetch to the connection message", async () => {

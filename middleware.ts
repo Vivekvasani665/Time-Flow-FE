@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 // /reset-password and /accept-invitation are reached from a shared link, by someone who has no session.
-const PUBLIC_PATHS = ["/login", "/signup", "/reset-password", "/accept-invitation"];
+// /privacy is a public legal page.
+const PUBLIC_PATHS = ["/login", "/signup", "/reset-password", "/accept-invitation", "/privacy"];
 
 /**
  * UX-only gate: bounce visitors without any session cookie to /login before

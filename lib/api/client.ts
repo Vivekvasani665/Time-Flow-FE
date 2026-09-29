@@ -175,12 +175,45 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
   });
 }
 
+/**
+ * A free-tier backend sleeps when idle and takes up to ~a minute to boot; meanwhile the
+ * proxy answers 502/503/504 with an HTML page. Those come from the gateway, not the API
+ * (which always replies JSON), so the request never reached it and retrying is safe.
+ */
+const WAKE_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 8_000, 8_000, 10_000, 10_000, 10_000];
+
+function isGatewayWakeError(res: Response) {
+  return [502, 503, 504].includes(res.status) && !res.headers.get("content-type")?.includes("application/json");
+}
+
+function wait(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    });
+  });
+}
+
+async function sendWaitingForBackend(path: string, options: RequestOptions): Promise<Response> {
+  let res = await send(path, options);
+  for (const delay of WAKE_RETRY_DELAYS_MS) {
+    if (!isGatewayWakeError(res)) break;
+    logDiagnostic("info", `${options.method ?? "GET"} ${path} → ${res.status}, backend waking up; retrying in ${delay}ms`);
+    await wait(delay, options.signal);
+    res = await send(path, options);
+  }
+  return res;
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<ApiSuccess<T>> {
   if (!options.skipAuthRefresh) await ensureFreshSession();
 
   let res: Response;
   try {
-    res = await send(path, options);
+    res = await sendWaitingForBackend(path, options);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
     logDiagnostic("warn", `${options.method ?? "GET"} ${path} → network error`, { cause: error });

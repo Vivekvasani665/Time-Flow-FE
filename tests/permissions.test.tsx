@@ -85,7 +85,7 @@ describe("Sidebar", () => {
 });
 
 describe("UsersList permission-based actions", () => {
-  it("hides Delete, Edit and New user without the matching permissions", async () => {
+  it("hides Delete and Edit without the matching permissions", async () => {
     renderWithProviders(<UsersList />, { user: makeAuthUser(["users.view"]) });
 
     await screen.findAllByRole("button", { name: /actions for john doe/i });
@@ -101,7 +101,7 @@ describe("UsersList permission-based actions", () => {
     renderWithProviders(<UsersList />, { user: makeAuthUser(["users.view", "users.create", "users.update", "users.delete"]) });
 
     await screen.findAllByRole("button", { name: /actions for john doe/i });
-    expect(screen.getByRole("link", { name: /new user/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /new user/i })).not.toBeInTheDocument();
 
     const menu = await openFirstRowMenu();
     expect(within(menu).getByRole("menuitem", { name: /delete/i })).toBeInTheDocument();

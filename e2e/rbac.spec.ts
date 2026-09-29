@@ -13,8 +13,7 @@ async function login(page: Page, email: string) {
 
 test("admin can manage users end-to-end", async ({ page }) => {
   await login(page, "admin@timeflow.dev");
-  await page.getByRole("link", { name: /users/i }).first().click();
-  await page.getByRole("link", { name: /new user/i }).click();
+  await page.goto("/users/new");
 
   const email = `e2e.${Date.now()}@timeflow.dev`;
   await page.getByLabel("First name").fill("E2E");

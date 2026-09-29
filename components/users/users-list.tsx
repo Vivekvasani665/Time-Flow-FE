@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, KeyRound, MailPlus, Pencil, Power, Trash2, UserPlus } from "lucide-react";
+import { Eye, KeyRound, MailPlus, Pencil, Power, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -133,11 +133,6 @@ export function UsersList() {
                 Invite user
               </ButtonLink>
             )}
-            <Can permission="users.create">
-              <ButtonLink href="/users/new" icon={<UserPlus className="size-4" />}>
-                New user
-              </ButtonLink>
-            </Can>
           </>
         }
       />
@@ -196,8 +191,8 @@ export function UsersList() {
             ? { title: "No users match", description: "Try a different search or clear the filters." }
             : {
                 title: "No users found",
-                description: "Create your first user to get started.",
-                action: can("users.create") ? <ButtonLink href="/users/new" size="sm">New user</ButtonLink> : undefined,
+                description: "Invite your first user to get started.",
+                action: superAdmin ? <ButtonLink href="/users/invite" size="sm">Invite user</ButtonLink> : undefined,
               }
         }
         rowActions={(u) => {
