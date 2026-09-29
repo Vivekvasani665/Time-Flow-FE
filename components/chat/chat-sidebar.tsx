@@ -43,6 +43,7 @@ export function ChatSidebar({
   searchRef,
   className,
 }: ChatSidebarProps) {
+  const assistant = workspace.conversations.find((c) => c.kind === "assistant");
   const channels = workspace.conversations.filter((c) => c.kind === "channel");
   const directs = workspace.conversations.filter((c) => c.kind === "direct");
   const unread = (list: typeof channels) => list.reduce((n, c) => n + (c.muted ? 0 : c.unread), 0);
@@ -114,7 +115,8 @@ export function ChatSidebar({
           />
         ) : (
           <>
-            <ul className="mt-2">
+            <ul className="mt-2 space-y-px">
+              {assistant && <ConversationListItem conversation={assistant} active={assistant.id === selectedId} onSelect={onSelect} />}
               <li>
                 <button
                   type="button"

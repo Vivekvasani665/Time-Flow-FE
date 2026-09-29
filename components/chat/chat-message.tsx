@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Check, Clock, Copy, CornerUpLeft, MoreHorizontal, MoreVertical, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { AlertCircle, Check, Clock, Copy, CornerUpLeft, MoreHorizontal, MoreVertical, Pencil, RotateCcw, Sparkles, Trash2, X } from "lucide-react";
 import { memo, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/ui/avatar";
@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn, formatDateTime, fullName } from "@/lib/utils";
-import { CHAT_REACTIONS, type ChatMessageView } from "@/types/chat";
+import { ASSISTANT_USER, CHAT_REACTIONS, type ChatMessageView } from "@/types/chat";
 import { ChatReactionPicker, chatIconButton } from "./chat-reaction-picker";
 
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
@@ -52,6 +52,8 @@ type ChatMessageProps = ChatMessageHandlers & {
   /** Last of a run: shows the time. */
   endsGroup: boolean;
   highlighted: boolean;
+  /** Reply, edit, delete and reactions. Off where they don't apply (the assistant). */
+  interactive?: boolean;
 };
 
 export const ChatMessage = memo(function ChatMessage({
@@ -61,6 +63,7 @@ export const ChatMessage = memo(function ChatMessage({
   startsGroup,
   endsGroup,
   highlighted,
+  interactive = true,
   onReply,
   onEdit,
   onDelete,
@@ -72,7 +75,7 @@ export const ChatMessage = memo(function ChatMessage({
   const mine = message.sender.id === me;
   const deleted = message.deletedAt !== null;
   const pending = message.status !== undefined;
-  const actionable = !deleted && !pending;
+  const actionable = interactive && !deleted && !pending;
   const canEdit = actionable && mine;
   const canDelete = actionable && (mine || canModerate);
   const time = timeFmt.format(new Date(message.createdAt));
@@ -88,7 +91,14 @@ export const ChatMessage = memo(function ChatMessage({
         highlighted && "bg-cyan/10",
       )}
     >
-      {!mine && <div className="w-8 shrink-0 pt-5">{startsGroup && <Avatar user={message.sender} size="sm" />}</div>}
+      {!mine && <div className="w-8 shrink-0 pt-5">{startsGroup &&
+          (message.sender.id === ASSISTANT_USER.id ? (
+            <span className="flex size-8 items-center justify-center rounded-full bg-cyan/15 text-cyan" aria-hidden="true">
+              <Sparkles className="size-4" />
+            </span>
+          ) : (
+            <Avatar user={message.sender} size="sm" />
+          ))}</div>}
 
       <div className={cn("flex min-w-0 max-w-[85%] flex-col sm:max-w-[70%]", mine ? "items-end" : "items-start")}>
         {startsGroup && !mine && <p className="mb-1 truncate text-xs font-semibold text-ink-dim">{fullName(message.sender)}</p>}

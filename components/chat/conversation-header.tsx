@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, BellOff, CheckCheck, ChevronLeft, Hash, Lock, MoreVertical, Search } from "lucide-react";
+import { Bell, BellOff, CheckCheck, ChevronLeft, Eraser, Hash, Lock, MoreVertical, Search, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { Avatar, AvatarStack } from "@/components/ui/avatar";
 import {
@@ -22,11 +22,13 @@ type ConversationHeaderProps = {
   onSearch: () => void;
   onToggleMute: () => void;
   onMarkRead: () => void;
+  /** The assistant: start over instead of mute / mark as read. */
+  onClear?: () => void;
   /** Extra controls on the right, e.g. who's online in a live channel. */
   children?: ReactNode;
 };
 
-export function ConversationHeader({ conversation, onBack, onSearch, onToggleMute, onMarkRead, children }: ConversationHeaderProps) {
+export function ConversationHeader({ conversation, onBack, onSearch, onToggleMute, onMarkRead, onClear, children }: ConversationHeaderProps) {
   const { contact } = conversation;
   const ChannelIcon = conversation.visibility === "private" ? Lock : Hash;
 
@@ -36,7 +38,11 @@ export function ConversationHeader({ conversation, onBack, onSearch, onToggleMut
         <ChevronLeft className="size-5" />
       </button>
 
-      {contact ? (
+      {conversation.kind === "assistant" ? (
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-cyan/15 text-cyan" aria-hidden="true">
+          <Sparkles className="size-4" />
+        </span>
+      ) : contact ? (
         <span className="relative shrink-0">
           <Avatar user={contact} size="sm" />
           <PresenceDot presence={contact.presence} className="absolute -right-0.5 -bottom-0.5" decorative />
@@ -67,12 +73,20 @@ export function ConversationHeader({ conversation, onBack, onSearch, onToggleMut
           <MoreVertical className="size-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent>
+          {onClear ? (
+            <DropdownMenuItem icon={<Eraser />} onSelect={onClear}>
+              Start a new conversation
+            </DropdownMenuItem>
+          ) : (
+            <>
           <DropdownMenuItem icon={<CheckCheck />} onSelect={onMarkRead} disabled={conversation.unread === 0}>
             Mark as read
           </DropdownMenuItem>
           <DropdownMenuItem icon={conversation.muted ? <Bell /> : <BellOff />} onSelect={onToggleMute}>
             {conversation.muted ? "Unmute" : "Mute"} {conversation.kind === "channel" ? "channel" : "conversation"}
           </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

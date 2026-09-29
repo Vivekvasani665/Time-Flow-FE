@@ -1,6 +1,6 @@
 "use client";
 
-import { BellOff, Hash, Lock } from "lucide-react";
+import { BellOff, Hash, Lock, Sparkles } from "lucide-react";
 import { memo } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -43,7 +43,11 @@ export const ConversationListItem = memo(function ConversationListItem({ convers
           muted && !active && "opacity-60",
         )}
       >
-        {contact ? (
+        {conversation.kind === "assistant" ? (
+          <span className="flex size-5 shrink-0 items-center justify-center rounded bg-cyan/15 text-cyan" aria-hidden="true">
+            <Sparkles className="size-3.5" />
+          </span>
+        ) : contact ? (
           <span className="relative shrink-0">
             <Avatar user={contact} size="xs" className="size-7" />
             <PresenceDot presence={contact.presence} className="absolute -right-0.5 -bottom-0.5 size-2.5" />
@@ -58,6 +62,9 @@ export const ConversationListItem = memo(function ConversationListItem({ convers
               {contact ? contact.firstName : conversation.name}
               {contact && <span className="hidden font-normal text-ink-mute lg:inline"> {contact.lastName}</span>}
             </span>
+            {conversation.kind === "assistant" && (
+              <span className="rounded bg-cyan/10 px-1 text-[0.625rem] font-semibold tracking-wide text-cyan uppercase">AI</span>
+            )}
             {contact && lastMessage && (
               <span className="tabular ml-auto shrink-0 text-[0.6875rem] font-normal text-ink-mute">{shortTime(lastMessage.createdAt)}</span>
             )}

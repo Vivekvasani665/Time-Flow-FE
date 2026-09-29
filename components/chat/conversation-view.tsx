@@ -1,11 +1,12 @@
 "use client";
 
-import { LogIn, WifiOff } from "lucide-react";
+import { Info, LogIn, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePermissions } from "@/components/auth/auth-provider";
 import { buttonClasses } from "@/components/ui/button";
 import type { ChatWorkspace } from "@/hooks/use-chat-workspace";
+import { useAssistant } from "@/hooks/use-assistant";
 import { CHAT_PATH, useChat } from "@/hooks/use-chat";
 import type { ChatConversation, ChatMessageView } from "@/types/chat";
 import { ConversationHeader, LivePresence } from "./conversation-header";
@@ -139,3 +140,44 @@ export function MockConversation({ conversation, workspace, focusId, onBack, onS
 }
 
 function noop() {}
+
+const ASSISTANT_SUGGESTIONS = ["What are my tasks?", "Which of my tasks are overdue?", "Summarize my active projects", "What should I focus on today?"];
+
+/** TimeFlow Assistant — an AI that answers from the user's own projects and tasks. */
+export function AssistantConversation({ conversation, focusId, onBack, onSearch }: Omit<ConversationViewProps, "workspace">) {
+  const assistant = useAssistant();
+  const banner =
+    assistant.enabled === false ? (
+      <div className="flex items-center gap-2 border-b border-amber/25 bg-amber/10 px-4 py-2 text-sm text-amber" role="status">
+        <Info className="size-4 shrink-0" aria-hidden="true" />
+        <span>
+          <span className="font-semibold">The assistant isn&apos;t set up yet.</span> An administrator needs to add an Anthropic API key to the
+          server.
+        </span>
+      </div>
+    ) : null;
+
+  return (
+    <>
+      <ConversationHeader
+        conversation={conversation}
+        onBack={onBack}
+        onSearch={onSearch}
+        onToggleMute={noop}
+        onMarkRead={noop}
+        onClear={assistant.clear}
+      />
+      <ConversationPanel
+        controller={assistant.controller}
+        focusId={focusId}
+        banner={banner}
+        interactive={false}
+        suggestions={ASSISTANT_SUGGESTIONS}
+        placeholder="Ask about your projects and tasks…"
+        beginningLabel="Answers come from your TimeFlow data. The assistant can make mistakes — check anything important."
+        emptyTitle="Hi! I'm your TimeFlow Assistant"
+        emptyDescription="Ask me about your tasks, deadlines and projects. I only see what you can see in TimeFlow."
+      />
+    </>
+  );
+}

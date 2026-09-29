@@ -28,6 +28,8 @@ export type ConversationController = {
   loadingOlder: boolean;
   loadOlder: () => void;
   typingUsers: ChatUser[];
+  /** Replaces "… is typing" (e.g. what the assistant is doing). */
+  typingLabel?: string;
   canModerate: boolean;
   sendMessage: (content: string, replyTo: ChatMessageView | null) => void;
   editMessage: (id: string, content: string) => Promise<boolean>;
@@ -63,6 +65,10 @@ type ConversationPanelProps = {
   focusId?: string | null;
   /** Status banners (connection lost, signed out) under the header. */
   banner?: ReactNode;
+  /** Reply, edit, delete and reactions on messages. Off for the assistant. */
+  interactive?: boolean;
+  /** Starter questions offered while the conversation is empty. */
+  suggestions?: string[];
 };
 
 export function ConversationPanel({
@@ -74,6 +80,8 @@ export function ConversationPanel({
   newSince,
   focusId,
   banner,
+  interactive = true,
+  suggestions,
 }: ConversationPanelProps) {
   const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
   const [editing, setEditing] = useState<ChatMessageView | null>(null);
@@ -134,6 +142,7 @@ export function ConversationPanel({
           beginningLabel={beginningLabel}
           newSince={newSince}
           focusId={focusId}
+          interactive={interactive}
           onReply={onReply}
           onEdit={onEdit}
           onDelete={setPendingDelete}
@@ -147,16 +156,31 @@ export function ConversationPanel({
               title={emptyTitle}
               description={emptyDescription}
               action={
-                <Button size="sm" onClick={() => inputRef.current?.focus()}>
-                  Send a message
-                </Button>
+                suggestions?.length ? (
+                  <div className="flex max-w-md flex-wrap justify-center gap-2">
+                    {suggestions.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => sendMessage(s, null)}
+                        className="rounded-full border border-line-bright bg-panel px-3 py-1.5 text-sm text-ink-dim transition-colors hover:border-cyan/50 hover:text-ink"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <Button size="sm" onClick={() => inputRef.current?.focus()}>
+                    Send a message
+                  </Button>
+                )
               }
             />
           }
         />
       )}
 
-      <ChatTypingIndicator users={chat.typingUsers} />
+      <ChatTypingIndicator users={chat.typingUsers} label={chat.typingLabel} />
       <ChatInput
         textareaRef={inputRef}
         placeholder={placeholder}

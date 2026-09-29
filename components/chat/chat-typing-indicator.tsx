@@ -3,9 +3,11 @@
 import { typingLabel } from "@/lib/chat-state";
 import type { ChatUser } from "@/types/chat";
 
-/** Always takes its line, so the composer doesn't jump when someone starts typing. */
-export function ChatTypingIndicator({ users }: { users: ChatUser[] }) {
-  const label = typingLabel(users.map((u) => u.firstName));
+/**
+ * Always takes its line, so the composer doesn't jump when someone starts typing.
+ * `label` replaces the "… is typing" wording, e.g. "TimeFlow Assistant · Looking up tasks…". */
+export function ChatTypingIndicator({ users, label: override }: { users: ChatUser[]; label?: string }) {
+  const label = users.length === 0 ? "" : (override ?? typingLabel(users.map((u) => u.firstName)));
   return (
     <div className="flex h-6 items-center gap-2 px-4 text-xs text-ink-mute sm:px-5" aria-live="polite">
       {label && (

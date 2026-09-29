@@ -82,7 +82,7 @@ export type ChatPresence = "online" | "away" | "offline";
 /** A person you can message, with their presence. */
 export type ChatContact = ChatUser & { presence: ChatPresence };
 
-export type ChatConversationKind = "channel" | "direct";
+export type ChatConversationKind = "channel" | "direct" | "assistant";
 
 export type ChatConversation = {
   id: string;
@@ -102,3 +102,19 @@ export type ChatConversation = {
 };
 
 export type CreateChannelInput = { name: string; description: string; visibility: "public" | "private" };
+
+// ── Assistant (AI bot) ─────────────────────────────────────
+
+export const ASSISTANT_CONVERSATION_ID = "assistant";
+
+/** How the assistant appears as a message sender. */
+export const ASSISTANT_USER: ChatUser = { id: "timeflow-assistant", firstName: "TimeFlow", lastName: "Assistant", avatarUrl: null };
+
+export type AssistantStatus = { enabled: boolean; name: string; model: string };
+
+/** Streamed by POST /api/assistant/chat. */
+export type AssistantEvent =
+  | { type: "delta"; text: string }
+  | { type: "status"; text: string }
+  | { type: "done" }
+  | { type: "error"; message: string };

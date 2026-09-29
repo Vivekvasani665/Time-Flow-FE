@@ -39,6 +39,7 @@ type ChatMessageListProps = Omit<ChatMessageHandlers, "onJumpTo"> & {
   newSince?: string | null;
   /** Scrolled to and highlighted when set (e.g. opened from a search result). */
   focusId?: string | null;
+  interactive?: boolean;
 };
 
 export function ChatMessageList({
@@ -52,6 +53,7 @@ export function ChatMessageList({
   beginningLabel,
   newSince = null,
   focusId = null,
+  interactive = true,
   ...handlers
 }: ChatMessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -89,6 +91,9 @@ export function ChatMessageList({
         atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
       } else if (opening || atBottom.current || last.sender.id === me) scrollToBottom();
       else setUnseen((n) => n + 1);
+    } else if (atBottom.current && el.scrollHeight !== scrollHeight.current) {
+      // The last message grew (a streamed answer): stay with it.
+      el.scrollTop = el.scrollHeight;
     }
     firstId.current = first;
     lastId.current = last?.id;
@@ -187,6 +192,7 @@ export function ChatMessageList({
                     startsGroup={startsGroup(message, previous)}
                     endsGroup={!next || startsGroup(next, message)}
                     highlighted={highlightId === message.id}
+                    interactive={interactive}
                     onJumpTo={onJumpTo}
                     {...handlers}
                   />

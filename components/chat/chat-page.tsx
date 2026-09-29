@@ -9,7 +9,7 @@ import type { ChatContact } from "@/types/chat";
 import { ChatEmptyState, ThreadsEmptyState } from "./chat-empty-state";
 import { chatIconButton } from "./chat-reaction-picker";
 import { ChatSidebar, THREADS_ID } from "./chat-sidebar";
-import { LiveConversation, MockConversation } from "./conversation-view";
+import { AssistantConversation, LiveConversation, MockConversation } from "./conversation-view";
 import { CreateChannelDialog } from "./create-channel-dialog";
 import { NewChatDialog } from "./new-chat-dialog";
 
@@ -78,7 +78,9 @@ export function ChatPage() {
       />
 
       <section className={cn("min-w-0 flex-1 flex-col", paneOpen ? "flex" : "hidden md:flex")} aria-label="Conversation">
-        {selected?.live ? (
+        {selected?.kind === "assistant" ? (
+          <AssistantConversation key={selected.id} conversation={selected} focusId={focusId} onBack={back} onSearch={focusSearch} />
+        ) : selected?.live ? (
           <LiveConversation key={selected.id} conversation={selected} {...viewProps} />
         ) : selected && !workspace.ready ? null : selected ? (
           <MockConversation key={selected.id} conversation={selected} {...viewProps} />

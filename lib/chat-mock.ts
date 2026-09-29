@@ -1,4 +1,4 @@
-import type { ChatContact, ChatConversation, ChatMessage, ChatUser } from "@/types/chat";
+import { ASSISTANT_CONVERSATION_ID, type ChatContact, type ChatConversation, type ChatMessage, type ChatUser } from "@/types/chat";
 
 /**
  * Local stand-in for channels and direct messages until their APIs exist.
@@ -75,6 +75,19 @@ function direct(contactId: string, unread = 0): ChatConversation {
 }
 
 export const INITIAL_CONVERSATIONS: ChatConversation[] = [
+  // The AI assistant: real, served by /api/assistant. Pinned above everything else.
+  {
+    id: ASSISTANT_CONVERSATION_ID,
+    kind: "assistant",
+    name: "TimeFlow Assistant",
+    description: "AI · Answers from your projects and tasks",
+    visibility: null,
+    contact: null,
+    unread: 0,
+    muted: false,
+    lastMessage: null,
+    live: false,
+  },
   { ...channel(LIVE_CHANNEL_ID, "General", "Everyone in TimeFlow", "public"), live: true },
   channel("channel-leave", "Leave Monitoring", "Leave requests and approvals", "private"),
   direct("user-1", 2),
