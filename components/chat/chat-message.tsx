@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn, formatDateTime, fullName } from "@/lib/utils";
 import { ASSISTANT_USER, CHAT_REACTIONS, type ChatMessageView } from "@/types/chat";
+import { AssistantMarkdown } from "./assistant-markdown";
 import { ChatReactionPicker, chatIconButton } from "./chat-reaction-picker";
 
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
@@ -80,6 +81,7 @@ export const ChatMessage = memo(function ChatMessage({
   onJumpTo,
 }: ChatMessageProps) {
   const mine = message.sender.id === me;
+  const fromAssistant = message.sender.id === ASSISTANT_USER.id;
   const deleted = message.deletedAt !== null;
   const pending = message.status !== undefined;
   const actionable = interactive && !deleted && !pending;
@@ -99,7 +101,7 @@ export const ChatMessage = memo(function ChatMessage({
       )}
     >
       {!mine && <div className="w-8 shrink-0 pt-5">{startsGroup &&
-          (message.sender.id === ASSISTANT_USER.id ? (
+          (fromAssistant ? (
             <span className="flex size-8 items-center justify-center rounded-full bg-cyan/15 text-cyan" aria-hidden="true">
               <Sparkles className="size-4" />
             </span>
@@ -107,7 +109,14 @@ export const ChatMessage = memo(function ChatMessage({
             <Avatar user={message.sender} size="sm" />
           ))}</div>}
 
-      <div className={cn("flex min-w-0 max-w-[85%] flex-col sm:max-w-[70%]", mine ? "items-end" : "items-start")}>
+      <div
+        className={cn(
+          "flex min-w-0 flex-col",
+          // Assistant answers carry code and tables; give them the room.
+          fromAssistant ? "max-w-[92%] sm:max-w-[85%]" : "max-w-[85%] sm:max-w-[70%]",
+          mine ? "items-end" : "items-start",
+        )}
+      >
         {startsGroup && !mine && <p className="mb-1 truncate text-xs font-semibold text-ink-dim">{fullName(message.sender)}</p>}
 
         <div className={cn("flex max-w-full items-center gap-1", mine && "flex-row-reverse")}>
@@ -143,7 +152,11 @@ export const ChatMessage = memo(function ChatMessage({
                     </span>
                   </button>
                 )}
-                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{linkify(message.content)}</p>
+                {fromAssistant ? (
+                  <AssistantMarkdown content={message.content} />
+                ) : (
+                  <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{linkify(message.content)}</p>
+                )}
               </>
             )}
           </div>
@@ -192,6 +205,17 @@ export const ChatMessage = memo(function ChatMessage({
               {time}
             </time>
             {message.editedAt && !deleted && <span>· edited</span>}
+            {fromAssistant && !deleted && (
+              <button
+                type="button"
+                onClick={() => copyText(message)}
+                className="inline-flex items-center gap-0.5 hover:text-ink"
+                aria-label="Copy answer"
+                title="Copy answer"
+              >
+                · <Copy className="size-3" aria-hidden="true" /> Copy
+              </button>
+            )}
             {mine && <DeliveryStatus message={message} onRetry={onRetry} onDiscard={onDiscard} />}
           </div>
         )}

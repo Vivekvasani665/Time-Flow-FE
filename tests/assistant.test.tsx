@@ -34,16 +34,18 @@ describe("TimeFlow Assistant", () => {
 
   it("offers starter questions and streams the answer in", async () => {
     vi.mocked(assistantService.chat).mockImplementation(async (turns, onEvent) => {
-      expect(turns).toEqual([{ role: "user", content: "What are my tasks?" }]);
+      expect(turns).toEqual([{ role: "user", content: "Which of my tasks are overdue?" }]);
       onEvent({ type: "status", text: "Looking up tasks…" });
       onEvent({ type: "delta", text: "You have 2 tasks:\n" });
       onEvent({ type: "delta", text: "- Fix login bug" });
       onEvent({ type: "done" });
     });
     const pane = openAssistant();
-    fireEvent.click(pane.getByRole("button", { name: "What are my tasks?" }));
+    fireEvent.click(pane.getByRole("button", { name: "Which of my tasks are overdue?" }));
 
-    expect(await pane.findByText(/You have 2 tasks:/)).toHaveTextContent("You have 2 tasks: - Fix login bug");
+    expect(await pane.findByText("You have 2 tasks:")).toBeInTheDocument();
+    // Replies are Markdown: the "- " line is a real list item.
+    expect(pane.getByRole("listitem")).toHaveTextContent("Fix login bug");
     // The assistant's answers can't be edited, deleted or replied to.
     expect(pane.queryByRole("button", { name: "Reply" })).not.toBeInTheDocument();
   });
@@ -54,7 +56,7 @@ describe("TimeFlow Assistant", () => {
       onEvent({ type: "done" });
     });
     const pane = openAssistant();
-    const input = pane.getByPlaceholderText("Ask about your projects and tasks…");
+    const input = pane.getByPlaceholderText("Ask anything…");
     fireEvent.change(input, { target: { value: "How many projects?" } });
     fireEvent.keyDown(input, { key: "Enter" });
     await pane.findByText("Two.");
@@ -75,7 +77,7 @@ describe("TimeFlow Assistant", () => {
     const pane = openAssistant();
     expect(await pane.findByText(/isn't set up yet/)).toBeInTheDocument();
 
-    fireEvent.click(pane.getByRole("button", { name: "Summarize my active projects" }));
+    fireEvent.click(pane.getByRole("button", { name: "What should I focus on today?" }));
     expect(await pane.findByText("Failed to send")).toBeInTheDocument();
     // Once in the banner, once as the reason under the failed question.
     expect(pane.getAllByText("The assistant isn't set up yet.")).toHaveLength(2);
@@ -87,5 +89,25 @@ describe("TimeFlow Assistant", () => {
     fireEvent.click(pane.getByRole("button", { name: /retry/i }));
     expect(await pane.findByText("All on track.")).toBeInTheDocument();
     expect(pane.queryByText("Failed to send")).not.toBeInTheDocument();
+  });
+
+  it("can stop an answer while it is being written, keeping what arrived", async () => {
+    let signal: AbortSignal | undefined;
+    vi.mocked(assistantService.chat).mockImplementation(async (_t, onEvent, abortSignal) => {
+      signal = abortSignal;
+      onEvent({ type: "delta", text: "Here is the start" });
+      await new Promise<void>((_resolve, reject) =>
+        abortSignal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))),
+      );
+    });
+    const pane = openAssistant();
+    fireEvent.click(pane.getByRole("button", { name: "What should I focus on today?" }));
+    await pane.findByText("Here is the start");
+
+    fireEvent.click(pane.getByRole("button", { name: "Stop generating" }));
+    await waitFor(() => expect(pane.getByRole("button", { name: "Send message" })).toBeInTheDocument());
+    expect(signal?.aborted).toBe(true);
+    expect(pane.getByText("Here is the start")).toBeInTheDocument();
+    expect(pane.queryByText("Sending…")).not.toBeInTheDocument();
   });
 });

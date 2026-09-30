@@ -1,6 +1,6 @@
 "use client";
 
-import { Paperclip, SendHorizontal, Smile } from "lucide-react";
+import { Paperclip, SendHorizontal, Smile, Square } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type Ref } from "react";
 import { cn } from "@/lib/utils";
 import { CHAT_MESSAGE_MAX_LENGTH, type ChatMessageView } from "@/types/chat";
@@ -28,6 +28,8 @@ type ChatInputProps = {
   placeholder?: string;
   /** Attach button; hidden when absent. */
   onAttach?: () => void;
+  /** While set, the send button becomes Stop (e.g. the assistant is answering). */
+  onStop?: () => void;
 };
 
 export function ChatInput({
@@ -41,6 +43,7 @@ export function ChatInput({
   textareaRef,
   placeholder = "Type a message…",
   onAttach,
+  onStop,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
@@ -208,15 +211,27 @@ export function ChatInput({
             </div>
           )}
         </div>
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          aria-label={editing ? "Save edit" : "Send message"}
-          title={editing ? "Save (Enter)" : "Send (Enter)"}
-          className="mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-cyan text-white shadow-sm transition-colors hover:bg-cyan-deep disabled:pointer-events-none disabled:opacity-40 [:root[data-theme=dark]_&]:text-void"
-        >
-          <SendHorizontal className="size-4" />
-        </button>
+        {onStop ? (
+          <button
+            type="button"
+            onClick={onStop}
+            aria-label="Stop generating"
+            title="Stop generating"
+            className="mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-ink text-panel shadow-sm transition-opacity hover:opacity-85"
+          >
+            <Square className="size-3.5 fill-current" />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            aria-label={editing ? "Save edit" : "Send message"}
+            title={editing ? "Save (Enter)" : "Send (Enter)"}
+            className="mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-cyan text-white shadow-sm transition-colors hover:bg-cyan-deep disabled:pointer-events-none disabled:opacity-40 [:root[data-theme=dark]_&]:text-void"
+          >
+            <SendHorizontal className="size-4" />
+          </button>
+        )}
       </form>
     </div>
   );

@@ -39,6 +39,8 @@ export type ConversationController = {
   discardMessage: (clientId: string) => void;
   startTyping: () => void;
   stopTyping: () => void;
+  /** Set while an answer is being written (the assistant): the composer offers Stop instead of Send. */
+  onStop?: () => void;
 };
 
 function MessagesSkeleton() {
@@ -191,6 +193,7 @@ export function ConversationPanel({
         onSaveEdit={onSaveEdit}
         onTypingStart={chat.startTyping}
         onTypingStop={chat.stopTyping}
+        onStop={chat.onStop}
         onAttach={() => toast("File sharing is coming soon", { description: "You'll be able to attach files to messages here." })}
       />
 

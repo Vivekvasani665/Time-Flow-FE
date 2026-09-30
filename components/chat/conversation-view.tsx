@@ -141,9 +141,14 @@ export function MockConversation({ conversation, workspace, focusId, onBack, onS
 
 function noop() {}
 
-const ASSISTANT_SUGGESTIONS = ["What are my tasks?", "Which of my tasks are overdue?", "Summarize my active projects", "What should I focus on today?"];
+const ASSISTANT_SUGGESTIONS = [
+  "Which of my tasks are overdue?",
+  "What should I focus on today?",
+  "Explain async/await in JavaScript",
+  "Write a polite follow-up email to a client",
+];
 
-/** TimeFlow Assistant — an AI that answers from the user's own projects and tasks. */
+/** TimeFlow Assistant — a general AI chat that can also look up the user's own projects and tasks. */
 export function AssistantConversation({ conversation, focusId, onBack, onSearch }: Omit<ConversationViewProps, "workspace">) {
   const assistant = useAssistant();
   const banner =
@@ -173,10 +178,10 @@ export function AssistantConversation({ conversation, focusId, onBack, onSearch 
         banner={banner}
         interactive={false}
         suggestions={ASSISTANT_SUGGESTIONS}
-        placeholder="Ask about your projects and tasks…"
-        beginningLabel="Answers come from your TimeFlow data. The assistant can make mistakes — check anything important."
+        placeholder="Ask anything…"
+        beginningLabel="The assistant can make mistakes — check anything important."
         emptyTitle="Hi! I'm your TimeFlow Assistant"
-        emptyDescription="Ask me about your tasks, deadlines and projects. I only see what you can see in TimeFlow."
+        emptyDescription="Ask me anything — code, writing, ideas — or about your tasks, deadlines and projects. I only see TimeFlow data you can see."
       />
     </>
   );

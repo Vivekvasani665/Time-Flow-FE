@@ -125,7 +125,10 @@ export function useAssistant() {
       await assistantService.chat(turns, onEvent, abort.signal);
       if (!settled && replyId === null) confirmQuestion();
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        // Stopped by the user: the question stands, with whatever answer had arrived.
+        confirmQuestion();
+      } else {
         const text = failureText(error);
         setMessages((prev) => prev.map((m) => (m.id === questionId ? { ...m, status: "failed", error: text } : m)));
         if (isApiError(error) && error.status === 429) toast.error("Slow down a little", { description: text });
@@ -171,6 +174,8 @@ export function useAssistant() {
 
   const discardMessage = useCallback((id: string) => setMessages((prev) => prev.filter((m) => m.id !== id)), []);
 
+  const stop = useCallback(() => abortRef.current?.abort(), []);
+
   const clear = useCallback(() => {
     abortRef.current?.abort();
     setMessages([]);
@@ -195,6 +200,7 @@ export function useAssistant() {
     discardMessage,
     startTyping: noop,
     stopTyping: noop,
+    onStop: busy ? stop : undefined,
   };
 
   return { controller, clear, busy, enabled: status.data?.enabled ?? null };
