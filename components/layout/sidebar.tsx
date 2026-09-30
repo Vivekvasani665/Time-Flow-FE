@@ -4,6 +4,7 @@ import { ChevronsLeft, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePermissions } from "@/components/auth/auth-provider";
+import { ChatUnreadBadge } from "@/components/chat/chat-unread-badge";
 import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
 import { NAV_ITEMS } from "./nav-items";
@@ -58,8 +59,12 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
                   active ? "bg-cyan text-white shadow-lg shadow-cyan/30" : "text-white/70 hover:bg-white/[0.06] hover:text-white",
                 )}
               >
-                <Icon className="size-[18px] shrink-0" />
+                <span className="relative shrink-0">
+                  <Icon className="size-[18px]" />
+                  {item.badge === "chat-unread" && collapsed && <ChatUnreadBadge variant="dot" className="hidden lg:block" />}
+                </span>
                 <span className={cn("truncate", collapsed && "lg:hidden")}>{item.label}</span>
+                {item.badge === "chat-unread" && <ChatUnreadBadge className={cn("ml-auto", collapsed && "lg:hidden")} />}
               </Link>
             );
           })}

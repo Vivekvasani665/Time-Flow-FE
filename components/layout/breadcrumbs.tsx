@@ -14,6 +14,7 @@ const LABELS: Record<string, string> = {
   tasks: "Tasks",
   activity: "Activity log",
   emails: "Mailbox",
+  chat: "Chat",
   settings: "Settings",
   system: "System",
   profile: "Profile",

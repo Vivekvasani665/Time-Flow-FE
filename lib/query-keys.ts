@@ -39,6 +39,12 @@ export const queryKeys = {
     stats: (params: ActivityListParams) => ["activity", "stats", params] as const,
   },
   notifications: ["notifications"] as const,
+  chat: {
+    unread: ["chat", "unread"] as const,
+  },
+  assistant: {
+    status: ["assistant", "status"] as const,
+  },
   sessions: ["auth", "sessions"] as const,
   twoFactor: ["auth", "2fa"] as const,
   mailSettings: ["mail-settings"] as const,
