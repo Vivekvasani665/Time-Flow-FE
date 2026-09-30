@@ -45,6 +45,10 @@ export const queryKeys = {
   assistant: {
     status: ["assistant", "status"] as const,
   },
+  calls: {
+    contacts: ["calls", "contacts"] as const,
+    history: (userId: string) => ["calls", "history", userId] as const,
+  },
   sessions: ["auth", "sessions"] as const,
   twoFactor: ["auth", "2fa"] as const,
   mailSettings: ["mail-settings"] as const,

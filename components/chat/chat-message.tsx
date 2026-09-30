@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn, formatDateTime, fullName } from "@/lib/utils";
 import { ASSISTANT_USER, CHAT_REACTIONS, type AssistantAttachment, type ChatMessageView } from "@/types/chat";
+import { CallHistoryEntry } from "@/components/calls/call-history-entry";
 import { AssistantMarkdown } from "./assistant-markdown";
 import { ChatReactionPicker, chatIconButton } from "./chat-reaction-picker";
 
@@ -80,6 +81,7 @@ export const ChatMessage = memo(function ChatMessage({
   onDiscard,
   onJumpTo,
 }: ChatMessageProps) {
+  if (message.call) return <CallHistoryEntry call={message.call} />;
   const mine = message.sender.id === me;
   const fromAssistant = message.sender.id === ASSISTANT_USER.id;
   const deleted = message.deletedAt !== null;

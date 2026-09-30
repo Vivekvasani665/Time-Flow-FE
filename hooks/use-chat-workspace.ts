@@ -5,6 +5,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { buildMockMessages, directConversationId, INITIAL_CONVERSATIONS, MOCK_CONTACTS } from "@/lib/chat-mock";
 import { fullName } from "@/lib/utils";
 import type { ChatContact, ChatConversation, ChatMessage, ChatMessageView, ChatUser, CreateChannelInput } from "@/types/chat";
+import { useCallContacts } from "./use-call-contacts";
 import { useChatUnread } from "./use-chat";
 
 export type ChatSearchResults = {
@@ -32,8 +33,18 @@ const slug = (name: string) =>
 export function useChatWorkspace() {
   const { user } = useAuth();
   const liveUnread = useChatUnread();
+  const team = useCallContacts();
   const [conversations, setConversations] = useState<ChatConversation[]>(INITIAL_CONVERSATIONS);
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
+
+  // Real team members first (they can be called), then the local sample contacts.
+  const contacts: ChatContact[] = useMemo(
+    () => [
+      ...team.map(({ online, ...u }): ChatContact => ({ ...u, presence: online ? "online" : "offline", callable: true })),
+      ...MOCK_CONTACTS,
+    ],
+    [team],
+  );
 
   const me: ChatUser | null = useMemo(
     () => (user ? { id: user.id, firstName: user.firstName, lastName: user.lastName, avatarUrl: user.avatarUrl } : null),
@@ -47,8 +58,11 @@ export function useChatWorkspace() {
 
   const list = useMemo(
     () =>
-      conversations.map((c) => {
-        if (c.live) return { ...c, unread: liveUnread };
+      conversations.map((conversation) => {
+        if (conversation.live) return { ...conversation, unread: liveUnread };
+        // Keep a real person's presence current in their conversation.
+        const person = conversation.contact?.callable ? contacts.find((p) => p.id === conversation.contact!.id) : undefined;
+        const c = person ? { ...conversation, contact: person } : conversation;
         const last = messages[c.id]?.filter((m) => !m.deletedAt).at(-1);
         return {
           ...c,
@@ -57,7 +71,7 @@ export function useChatWorkspace() {
             : null,
         };
       }),
-    [conversations, messages, liveUnread, me?.id],
+    [conversations, messages, liveUnread, me?.id, contacts],
   );
 
   const patch = useCallback((id: string, change: Partial<ChatConversation>) => {
@@ -204,7 +218,7 @@ export function useChatWorkspace() {
     (query: string): ChatSearchResults => {
       const q = query.trim().toLowerCase();
       if (!q) return { people: [], channels: [], messages: [] };
-      const people = MOCK_CONTACTS.filter((c) => fullName(c).toLowerCase().includes(q));
+      const people = contacts.filter((c) => fullName(c).toLowerCase().includes(q));
       const channels = list.filter((c) => c.kind === "channel" && c.name.toLowerCase().includes(q));
       const found = list.flatMap((conversation) =>
         (messages[conversation.id] ?? [])
@@ -214,7 +228,7 @@ export function useChatWorkspace() {
       found.sort((a, b) => (a.message.createdAt < b.message.createdAt ? 1 : -1));
       return { people, channels, messages: found.slice(0, 20) };
     },
-    [list, messages],
+    [list, messages, contacts],
   );
 
   return {
@@ -222,7 +236,7 @@ export function useChatWorkspace() {
     /** Mock messages are seeded; until then a mock conversation has nothing to show. */
     ready: Object.keys(messages).length > 0,
     conversations: list,
-    contacts: MOCK_CONTACTS,
+    contacts,
     messages,
     markRead,
     toggleMute,

@@ -1,4 +1,5 @@
 // Mirrors the backend's chat module (src/modules/chat/chat.types.ts).
+import type { CallHistoryItem } from "./call";
 
 /** The reactions the API accepts. */
 export const CHAT_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🎉"] as const;
@@ -53,6 +54,8 @@ export type ChatMessageView = ChatMessage & {
   error?: string;
   /** Files sent with the message (the assistant only). */
   attachments?: AssistantAttachment[];
+  /** A call in a direct conversation's history, shown as a call entry rather than a message. */
+  call?: CallHistoryItem;
 };
 
 export type ChatPage = { items: ChatMessage[]; hasMore: boolean; nextCursor: string | null };
@@ -82,7 +85,11 @@ export type ChatConnectionState = "connecting" | "connected" | "reconnecting" | 
 export type ChatPresence = "online" | "away" | "offline";
 
 /** A person you can message, with their presence. */
-export type ChatContact = ChatUser & { presence: ChatPresence };
+export type ChatContact = ChatUser & {
+  presence: ChatPresence;
+  /** A real team member (from the API) who can be called; the local sample contacts can't. */
+  callable?: boolean;
+};
 
 export type ChatConversationKind = "channel" | "direct" | "assistant";
 

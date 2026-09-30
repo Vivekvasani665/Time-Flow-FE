@@ -1,14 +1,17 @@
 "use client";
 
-import { Info, LogIn, WifiOff } from "lucide-react";
+import { Info, LogIn, PhoneCall, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePermissions } from "@/components/auth/auth-provider";
+import { CallButtons } from "@/components/calls/call-buttons";
 import { buttonClasses } from "@/components/ui/button";
 import type { ChatWorkspace } from "@/hooks/use-chat-workspace";
 import { useAssistant } from "@/hooks/use-assistant";
+import { useCallHistory } from "@/hooks/use-call-contacts";
 import { CHAT_PATH, useChat } from "@/hooks/use-chat";
-import type { ChatConversation, ChatMessageView } from "@/types/chat";
+import type { CallHistoryItem } from "@/types/call";
+import type { ChatConversation, ChatMessage, ChatMessageView } from "@/types/chat";
 import { ConversationHeader, LivePresence } from "./conversation-header";
 import { ConversationPanel, type ConversationController } from "./conversation-panel";
 
@@ -73,13 +76,35 @@ export function LiveConversation({ conversation, workspace, focusId, onBack, onS
   );
 }
 
+/** A call as a timeline entry, placed at the time it started. */
+const callEntry = (call: CallHistoryItem): ChatMessageView => ({
+  id: `call-${call.id}`,
+  content: "",
+  sender: call.caller,
+  replyTo: null,
+  reactions: [],
+  editedAt: null,
+  deletedAt: null,
+  createdAt: call.startedAt,
+  updatedAt: call.endedAt ?? call.startedAt,
+  call,
+});
+
 /**
  * Channels and DMs that don't have a backend yet: local state from the
- * workspace. Same panel, same controller shape as the live one.
+ * workspace. Same panel, same controller shape as the live one. A direct
+ * conversation with a real team member also has calls, which are real: the
+ * header can start one, and past calls appear in the timeline.
  */
 export function MockConversation({ conversation, workspace, focusId, onBack, onSearch }: ConversationViewProps) {
-  const { id } = conversation;
-  const messages = useMemo(() => workspace.messages[id] ?? [], [workspace.messages, id]);
+  const { id, contact } = conversation;
+  const callable = conversation.kind === "direct" && contact?.callable ? contact : null;
+  const calls = useCallHistory(callable?.id ?? null);
+  const messages = useMemo(() => {
+    const local: ChatMessageView[] = workspace.messages[id] ?? [];
+    if (!calls?.length) return local;
+    return [...local, ...calls.map(callEntry)].sort((a: ChatMessage, b: ChatMessage) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
+  }, [workspace.messages, id, calls]);
   const { markRead } = workspace;
 
   // Captured on opening, before it is marked read: where "New messages" begins.
@@ -133,8 +158,23 @@ export function MockConversation({ conversation, workspace, focusId, onBack, onS
         onSearch={onSearch}
         onToggleMute={() => workspace.toggleMute(id)}
         onMarkRead={() => markRead(id)}
+      >
+        {callable && <CallButtons peer={callable} />}
+      </ConversationHeader>
+      <ConversationPanel
+        controller={controller}
+        newSince={newSince}
+        focusId={focusId}
+        banner={
+          callable ? (
+            <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-4 py-2 text-xs text-ink-mute" role="note">
+              <PhoneCall className="size-3.5 shrink-0 text-cyan" aria-hidden="true" />
+              <span>Voice and video calls with {callable.firstName} are live. Direct messages are only saved in this browser for now.</span>
+            </div>
+          ) : null
+        }
+        {...copyFor(conversation)}
       />
-      <ConversationPanel controller={controller} newSince={newSince} focusId={focusId} {...copyFor(conversation)} />
     </>
   );
 }

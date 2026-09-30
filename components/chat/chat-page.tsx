@@ -2,7 +2,7 @@
 
 import { ChevronLeft } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatWorkspace } from "@/hooks/use-chat-workspace";
 import { cn } from "@/lib/utils";
 import type { ChatContact } from "@/types/chat";
@@ -53,6 +53,14 @@ export function ChatPage() {
     },
     [select, workspace],
   );
+
+  // A link to a conversation with a real person that isn't open yet (e.g. a missed-call notification): open it.
+  const { contacts, openDirect } = workspace;
+  useEffect(() => {
+    if (!selectedId?.startsWith("dm-") || selected) return;
+    const person = contacts.find((c) => c.callable && `dm-${c.id}` === selectedId);
+    if (person) openDirect(person);
+  }, [selectedId, selected, contacts, openDirect]);
 
   // The search box lives in the list; on a phone that means going back to it first.
   const focusSearch = useCallback(() => {
