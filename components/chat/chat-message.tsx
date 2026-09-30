@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Check, Clock, Copy, CornerUpLeft, MoreHorizontal, MoreVertical, Pencil, RotateCcw, Sparkles, Trash2, X } from "lucide-react";
+import { AlertCircle, Check, Clock, Copy, CornerUpLeft, FileText, ImageIcon, MoreHorizontal, MoreVertical, Pencil, RotateCcw, Sparkles, Trash2, X } from "lucide-react";
 import { memo, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/ui/avatar";
@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn, formatDateTime, fullName } from "@/lib/utils";
-import { ASSISTANT_USER, CHAT_REACTIONS, type ChatMessageView } from "@/types/chat";
+import { ASSISTANT_USER, CHAT_REACTIONS, type AssistantAttachment, type ChatMessageView } from "@/types/chat";
 import { AssistantMarkdown } from "./assistant-markdown";
 import { ChatReactionPicker, chatIconButton } from "./chat-reaction-picker";
 
@@ -152,11 +152,14 @@ export const ChatMessage = memo(function ChatMessage({
                     </span>
                   </button>
                 )}
+                {message.attachments && message.attachments.length > 0 && (
+                  <MessageAttachments attachments={message.attachments} mine={mine} spaced={Boolean(message.content)} />
+                )}
                 {fromAssistant ? (
                   <AssistantMarkdown content={message.content} />
-                ) : (
+                ) : message.content ? (
                   <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{linkify(message.content)}</p>
-                )}
+                ) : null}
               </>
             )}
           </div>
@@ -226,6 +229,30 @@ export const ChatMessage = memo(function ChatMessage({
     </div>
   );
 });
+
+function MessageAttachments({ attachments, mine, spaced }: { attachments: AssistantAttachment[]; mine: boolean; spaced: boolean }) {
+  return (
+    <ul className={cn("flex flex-wrap gap-1.5", spaced && "mb-1.5")} aria-label="Attachments">
+      {attachments.map((a, i) =>
+        a.kind === "image" && a.dataUrl ? (
+          <li key={i}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- a local data URL, nothing to optimise */}
+            <img src={a.dataUrl} alt={a.name} className="max-h-48 max-w-full rounded-lg object-contain" />
+          </li>
+        ) : (
+          <li
+            key={i}
+            className={cn("flex max-w-56 items-center gap-1.5 rounded-lg px-2 py-1 text-xs", mine ? "bg-white/15" : "bg-panel")}
+            title={a.kind === "image" ? `${a.name} (not kept after reload)` : a.truncated ? `${a.name} (only the first part was read)` : a.name}
+          >
+            {a.kind === "image" ? <ImageIcon className="size-3.5 shrink-0" aria-hidden="true" /> : <FileText className="size-3.5 shrink-0" aria-hidden="true" />}
+            <span className="min-w-0 truncate">{a.name}</span>
+          </li>
+        ),
+      )}
+    </ul>
+  );
+}
 
 function DeliveryStatus({ message, onRetry, onDiscard }: Pick<ChatMessageProps, "message" | "onRetry" | "onDiscard">) {
   if (message.status === "sending") {

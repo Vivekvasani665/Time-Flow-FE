@@ -6,10 +6,10 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { cn } from "@/lib/utils";
-import type { ChatMessageView, ChatUser } from "@/types/chat";
+import type { AssistantAttachment, ChatMessageView, ChatUser } from "@/types/chat";
 import { Button } from "@/components/ui/button";
 import { MessagesSquare } from "lucide-react";
-import { ChatInput } from "./chat-input";
+import { ChatInput, type AttachSupport } from "./chat-input";
 import { ChatMessageList } from "./chat-message-list";
 import { ChatTypingIndicator } from "./chat-typing-indicator";
 
@@ -31,7 +31,7 @@ export type ConversationController = {
   /** Replaces "… is typing" (e.g. what the assistant is doing). */
   typingLabel?: string;
   canModerate: boolean;
-  sendMessage: (content: string, replyTo: ChatMessageView | null) => void;
+  sendMessage: (content: string, replyTo: ChatMessageView | null, attachments?: AssistantAttachment[]) => void;
   editMessage: (id: string, content: string) => Promise<boolean>;
   deleteMessage: (id: string) => Promise<boolean>;
   toggleReaction: (message: ChatMessageView, emoji: string) => void;
@@ -41,6 +41,8 @@ export type ConversationController = {
   stopTyping: () => void;
   /** Set while an answer is being written (the assistant): the composer offers Stop instead of Send. */
   onStop?: () => void;
+  /** Where files can be sent (the assistant). Elsewhere the attach button says it's coming soon. */
+  attach?: AttachSupport;
 };
 
 function MessagesSkeleton() {
@@ -106,8 +108,8 @@ export function ConversationPanel({
     setEditing(null);
   }, []);
   const onSend = useCallback(
-    (content: string) => {
-      sendMessage(content, replyingTo);
+    (content: string, attachments?: AssistantAttachment[]) => {
+      sendMessage(content, replyingTo, attachments);
       setReplyingTo(null);
     },
     [sendMessage, replyingTo],
@@ -194,6 +196,7 @@ export function ConversationPanel({
         onTypingStart={chat.startTyping}
         onTypingStop={chat.stopTyping}
         onStop={chat.onStop}
+        attach={chat.attach}
         onAttach={() => toast("File sharing is coming soon", { description: "You'll be able to attach files to messages here." })}
       />
 

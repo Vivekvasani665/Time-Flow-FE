@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatPage } from "@/components/chat/chat-page";
 import { ApiError } from "@/lib/api/errors";
@@ -6,8 +7,9 @@ import { assistantService } from "@/services/assistant.service";
 import { makeAuthUser, renderWithProviders } from "./utils";
 import { setSearchParams } from "./setup";
 
+vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }), Toaster: () => null }));
 vi.mock("@/services/assistant.service", () => ({
-  assistantService: { status: vi.fn(), chat: vi.fn() },
+  assistantService: { status: vi.fn(), chat: vi.fn(), readDocument: vi.fn() },
 }));
 vi.mock("@/services/chat.service", () => ({
   chatService: { unread: vi.fn().mockResolvedValue({ count: 0, lastReadAt: null }), markRead: vi.fn(), list: vi.fn() },
@@ -109,5 +111,72 @@ describe("TimeFlow Assistant", () => {
     expect(signal?.aborted).toBe(true);
     expect(pane.getByText("Here is the start")).toBeInTheDocument();
     expect(pane.queryByText("Sending…")).not.toBeInTheDocument();
+  });
+
+  it("reads an attached document and sends its text with the question, and again with follow-ups", async () => {
+    const doc = { kind: "document" as const, name: "plan.pdf", text: "Sprint 5: write docs, fix login", truncated: false };
+    vi.mocked(assistantService.readDocument).mockResolvedValue(doc);
+    vi.mocked(assistantService.chat).mockImplementation(async (_t, onEvent) => {
+      onEvent({ type: "delta", text: "Done." });
+      onEvent({ type: "done" });
+    });
+    const pane = openAssistant();
+    const file = new File(["%PDF-"], "plan.pdf", { type: "application/pdf" });
+    fireEvent.change(pane.getByTestId("chat-file-input"), { target: { files: [file] } });
+
+    const attached = await pane.findByRole("list", { name: "Attached files" });
+    await waitFor(() => expect(within(attached).queryByText("(preparing)")).not.toBeInTheDocument());
+    expect(assistantService.readDocument).toHaveBeenCalledWith(file);
+
+    // A file alone can be sent, without typing anything.
+    fireEvent.click(pane.getByRole("button", { name: "Send message" }));
+    await pane.findByText("Done.");
+    expect(vi.mocked(assistantService.chat).mock.calls[0]![0]).toEqual([
+      { role: "user", content: "", attachments: [{ kind: "document", name: "plan.pdf", text: doc.text }] },
+    ]);
+    expect(within(pane.getByRole("list", { name: "Attachments" })).getByText("plan.pdf")).toBeInTheDocument();
+    expect(pane.queryByRole("list", { name: "Attached files" })).not.toBeInTheDocument();
+
+    const input = pane.getByPlaceholderText("Ask anything…");
+    fireEvent.change(input, { target: { value: "Make tasks from it" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(assistantService.chat).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(assistantService.chat).mock.calls[1]![0][0]).toMatchObject({ attachments: [{ name: "plan.pdf" }] });
+  });
+
+  it("explains why a file couldn't be attached", async () => {
+    const pane = openAssistant();
+    fireEvent.change(pane.getByTestId("chat-file-input"), { target: { files: [new File(["MZ"], "setup.exe")] } });
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Couldn't attach the file", { description: expect.stringMatching(/setup.exe can't be read/) }),
+    );
+    expect(pane.queryByRole("list", { name: "Attached files" })).not.toBeInTheDocument();
+    expect(assistantService.readDocument).not.toHaveBeenCalled();
+  });
+
+  it("names pictures that were not kept after a reload instead of sending them", async () => {
+    const user = makeAuthUser();
+    const saved = [
+      {
+        id: "q1", content: "What is this?", sender: { id: user.id, firstName: user.firstName, lastName: user.lastName, avatarUrl: null },
+        replyTo: null, reactions: [], editedAt: null, deletedAt: null, createdAt: "2026-09-30T09:00:00Z", updatedAt: "2026-09-30T09:00:00Z",
+        attachments: [{ kind: "image", name: "board.png", dataUrl: null }],
+      },
+    ];
+    sessionStorage.setItem(`tf.assistant.${user.id}`, JSON.stringify(saved));
+    vi.mocked(assistantService.chat).mockImplementation(async (_t, onEvent) => onEvent({ type: "done" }));
+    setSearchParams({ c: "assistant" });
+    renderWithProviders(<ChatPage />, { user });
+    const pane = within(screen.getByRole("region", { name: "Conversation" }));
+    expect(pane.getByTitle("board.png (not kept after reload)")).toBeInTheDocument();
+
+    const input = pane.getByPlaceholderText("Ask anything…");
+    fireEvent.change(input, { target: { value: "And now?" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(assistantService.chat).toHaveBeenCalled());
+    expect(vi.mocked(assistantService.chat).mock.calls[0]![0][0]).toEqual({
+      role: "user",
+      content: "What is this?\n\n[Attached earlier, no longer available to you: board.png]",
+    });
   });
 });

@@ -6,9 +6,10 @@ import { toast } from "sonner";
 import { useAuth } from "@/components/auth/auth-provider";
 import type { ConversationController } from "@/components/chat/conversation-panel";
 import { isApiError } from "@/lib/api/errors";
+import { ASSISTANT_ACCEPT, ASSISTANT_ATTACHMENT_LIMITS, prepareAttachment } from "@/lib/assistant-attachments";
 import { queryKeys } from "@/lib/query-keys";
 import { assistantService, type AssistantTurn } from "@/services/assistant.service";
-import { ASSISTANT_USER, type AssistantEvent, type ChatMessageView } from "@/types/chat";
+import { ASSISTANT_USER, type AssistantAttachment, type AssistantEvent, type ChatMessageView } from "@/types/chat";
 
 const STORAGE_PREFIX = "tf.assistant.";
 /** The API accepts up to 40 turns; older ones are dropped from what is sent, not from the screen. */
@@ -23,9 +24,15 @@ function load(userId: string): ChatMessageView[] {
   }
 }
 
+/** Pictures are too big for session storage; their names stay so the conversation still reads right. */
+const withoutImageData = (m: ChatMessageView): ChatMessageView =>
+  m.attachments?.some((a) => a.kind === "image")
+    ? { ...m, attachments: m.attachments.map((a) => (a.kind === "image" ? { ...a, dataUrl: null } : a)) }
+    : m;
+
 function save(userId: string, messages: ChatMessageView[]) {
   try {
-    sessionStorage.setItem(STORAGE_PREFIX + userId, JSON.stringify(messages));
+    sessionStorage.setItem(STORAGE_PREFIX + userId, JSON.stringify(messages.map(withoutImageData)));
   } catch {
     /* storage full or blocked — the conversation just won't survive a reload */
   }
@@ -38,6 +45,36 @@ function failureText(error: unknown): string {
     if (error.status < 500) return error.message;
   }
   return "The assistant couldn't answer. Please try again.";
+}
+
+/**
+ * The conversation as the API takes it. Files are sent again with every
+ * question (the server keeps nothing), newest first until the size limits
+ * are reached; anything older is named instead so the model knows it existed.
+ */
+function toTurns(history: ChatMessageView[]): AssistantTurn[] {
+  let images = ASSISTANT_ATTACHMENT_LIMITS.images;
+  let chars = ASSISTANT_ATTACHMENT_LIMITS.documentChars;
+  const newestFirst = [...history].reverse().map((m): AssistantTurn => {
+    if (m.sender.id === ASSISTANT_USER.id) return { role: "assistant", content: m.content };
+    const sent: NonNullable<Extract<AssistantTurn, { role: "user" }>["attachments"]> = [];
+    const gone: string[] = [];
+    for (const a of m.attachments ?? []) {
+      if (a.kind === "image" && a.dataUrl && images > 0) {
+        images--;
+        sent.push({ kind: "image", name: a.name, dataUrl: a.dataUrl });
+      } else if (a.kind === "document" && a.text.length <= chars) {
+        chars -= a.text.length;
+        sent.push({ kind: "document", name: a.name, text: a.text });
+      } else {
+        gone.push(a.name);
+      }
+    }
+    const note = gone.length ? `[Attached earlier, no longer available to you: ${gone.join(", ")}]` : "";
+    const content = [m.content, note].filter(Boolean).join("\n\n");
+    return sent.length ? { role: "user", content, attachments: sent } : { role: "user", content };
+  });
+  return newestFirst.reverse();
 }
 
 function message(sender: ChatMessageView["sender"], content: string, extra: Partial<ChatMessageView> = {}): ChatMessageView {
@@ -72,11 +109,12 @@ export function useAssistant() {
 
   const run = useCallback(async (questionId: string) => {
     const upTo = messagesRef.current.findIndex((m) => m.id === questionId);
-    const turns: AssistantTurn[] = messagesRef.current
-      .slice(0, upTo + 1)
-      .filter((m) => !m.deletedAt && m.content && (m.id === questionId || m.status === undefined))
-      .map((m): AssistantTurn => ({ role: m.sender.id === ASSISTANT_USER.id ? "assistant" : "user", content: m.content }))
-      .slice(-MAX_TURNS);
+    const turns = toTurns(
+      messagesRef.current
+        .slice(0, upTo + 1)
+        .filter((m) => !m.deletedAt && (m.content || m.attachments?.length) && (m.id === questionId || m.status === undefined))
+        .slice(-MAX_TURNS),
+    );
     // The API wants the history to start with the user.
     while (turns[0]?.role === "assistant") turns.shift();
 
@@ -141,7 +179,7 @@ export function useAssistant() {
   }, []);
 
   const sendMessage = useCallback(
-    (content: string) => {
+    (content: string, _replyTo: ChatMessageView | null = null, attachments?: AssistantAttachment[]) => {
       if (!user) return;
       if (busy) {
         toast("One moment", { description: "The assistant is still answering your last question." });
@@ -150,7 +188,7 @@ export function useAssistant() {
       const question = message(
         { id: user.id, firstName: user.firstName, lastName: user.lastName, avatarUrl: user.avatarUrl },
         content,
-        { status: "sending" },
+        attachments?.length ? { status: "sending", attachments } : { status: "sending" },
       );
       messagesRef.current = [...messagesRef.current, question];
       setMessages(messagesRef.current);
@@ -201,9 +239,12 @@ export function useAssistant() {
     startTyping: noop,
     stopTyping: noop,
     onStop: busy ? stop : undefined,
+    attach: ATTACH,
   };
 
   return { controller, clear, busy, enabled: status.data?.enabled ?? null };
 }
+
+const ATTACH = { accept: ASSISTANT_ACCEPT, max: ASSISTANT_ATTACHMENT_LIMITS.perMessage, prepare: prepareAttachment };
 
 function noop() {}

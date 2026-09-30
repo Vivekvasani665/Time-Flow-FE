@@ -1,7 +1,9 @@
 import { api, ApiError, ensureFreshSession, refreshSession } from "@/lib/api/client";
-import type { AssistantEvent, AssistantStatus } from "@/types/chat";
+import type { AssistantAttachment, AssistantEvent, AssistantStatus } from "@/types/chat";
 
-export type AssistantTurn = { role: "user" | "assistant"; content: string };
+type SentAttachment = { kind: "document"; name: string; text: string } | { kind: "image"; name: string; dataUrl: string };
+
+export type AssistantTurn = { role: "user"; content: string; attachments?: SentAttachment[] } | { role: "assistant"; content: string };
 
 async function post(body: unknown, signal: AbortSignal): Promise<Response> {
   return fetch("/api/assistant/chat", {
@@ -35,6 +37,14 @@ function drain(buffer: string, onEvent: (event: AssistantEvent) => void): string
 
 export const assistantService = {
   status: () => api.get<AssistantStatus>("/assistant/status"),
+
+  /** Has the server pull the text out of a document (PDF, Word, TXT, Markdown, CSV). Nothing is stored. */
+  readDocument: async (file: File): Promise<Extract<AssistantAttachment, { kind: "document" }>> => {
+    const form = new FormData();
+    form.append("file", file);
+    const { data } = await api.post<{ name: string; text: string; truncated: boolean }>("/assistant/attachments", form);
+    return { kind: "document", ...data };
+  },
 
   /**
    * Asks the assistant and streams its answer through `onEvent`. Rejects with

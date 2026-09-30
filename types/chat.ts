@@ -51,6 +51,8 @@ export type ChatMessageView = ChatMessage & {
   status?: ChatDeliveryStatus;
   /** Why sending failed, in words for the user. */
   error?: string;
+  /** Files sent with the message (the assistant only). */
+  attachments?: AssistantAttachment[];
 };
 
 export type ChatPage = { items: ChatMessage[]; hasMore: boolean; nextCursor: string | null };
@@ -111,6 +113,15 @@ export const ASSISTANT_CONVERSATION_ID = "assistant";
 export const ASSISTANT_USER: ChatUser = { id: "timeflow-assistant", firstName: "TimeFlow", lastName: "Assistant", avatarUrl: null };
 
 export type AssistantStatus = { enabled: boolean; name: string; model: string };
+
+/**
+ * A file sent to the assistant. Documents carry their extracted text; images
+ * a resized data URL, which is null once the conversation has been reloaded
+ * (pictures are too big to keep in session storage).
+ */
+export type AssistantAttachment =
+  | { kind: "document"; name: string; text: string; truncated?: boolean }
+  | { kind: "image"; name: string; dataUrl: string | null };
 
 /** Streamed by POST /api/assistant/chat. */
 export type AssistantEvent =

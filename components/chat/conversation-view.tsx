@@ -144,11 +144,11 @@ function noop() {}
 const ASSISTANT_SUGGESTIONS = [
   "Which of my tasks are overdue?",
   "What should I focus on today?",
-  "Explain async/await in JavaScript",
-  "Write a polite follow-up email to a client",
+  "Create a task and assign it to whoever is least busy",
+  "Translate this into Hindi: The release is moved to Friday",
 ];
 
-/** TimeFlow Assistant — a general AI chat that can also look up the user's own projects and tasks. */
+/** TimeFlow Assistant — an AI chat for work: it looks up, creates and assigns tasks, translates, writes, and reads attached files. */
 export function AssistantConversation({ conversation, focusId, onBack, onSearch }: Omit<ConversationViewProps, "workspace">) {
   const assistant = useAssistant();
   const banner =
@@ -181,7 +181,7 @@ export function AssistantConversation({ conversation, focusId, onBack, onSearch 
         placeholder="Ask anything…"
         beginningLabel="The assistant can make mistakes — check anything important."
         emptyTitle="Hi! I'm your TimeFlow Assistant"
-        emptyDescription="Ask me anything — code, writing, ideas — or about your tasks, deadlines and projects. I only see TimeFlow data you can see."
+        emptyDescription="Ask about your tasks and projects, have me create and assign tasks, translate, or write something. Attach a PDF, Word file or screenshot and I'll read it. I only see and change what you can."
       />
     </>
   );

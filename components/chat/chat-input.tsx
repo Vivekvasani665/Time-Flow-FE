@@ -1,9 +1,10 @@
 "use client";
 
-import { Paperclip, SendHorizontal, Smile, Square } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent, type Ref } from "react";
+import { FileText, ImageIcon, Loader2, Paperclip, SendHorizontal, Smile, Square, X } from "lucide-react";
+import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type Ref } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { CHAT_MESSAGE_MAX_LENGTH, type ChatMessageView } from "@/types/chat";
+import { CHAT_MESSAGE_MAX_LENGTH, type AssistantAttachment, type ChatMessageView } from "@/types/chat";
 import { ChatReactionPicker, COMPOSER_EMOJI } from "./chat-reaction-picker";
 import { ChatReplyPreview } from "./chat-reply-preview";
 
@@ -15,19 +16,33 @@ const MAX_HEIGHT_PX = 160;
 const COUNTER_FROM = CHAT_MESSAGE_MAX_LENGTH - 200;
 export const MESSAGE_TOO_LONG = `Your message is too long. Please keep it under ${CHAT_MESSAGE_MAX_LENGTH} characters.`;
 
+/** Lets the composer send files (the assistant). */
+export type AttachSupport = {
+  /** For the file picker, e.g. "image/png,.pdf". */
+  accept: string;
+  /** Files per message. */
+  max: number;
+  /** Reads or resizes a picked file; rejects with a message for the user. */
+  prepare: (file: File) => Promise<AssistantAttachment>;
+};
+
+type PendingFile = { id: string; name: string; image: boolean; ready: AssistantAttachment | null };
+
 type ChatInputProps = {
   replyingTo: ChatMessageView | null;
   editing: ChatMessageView | null;
   onCancelContext: () => void;
-  onSend: (content: string) => void;
+  onSend: (content: string, attachments?: AssistantAttachment[]) => void;
   onSaveEdit: (message: ChatMessageView, content: string) => Promise<boolean>;
   onTypingStart: () => void;
   onTypingStop: () => void;
   textareaRef?: Ref<HTMLTextAreaElement>;
   /** e.g. "Message #General". */
   placeholder?: string;
-  /** Attach button; hidden when absent. */
+  /** Attach button; hidden when absent. Ignored when `attach` is set. */
   onAttach?: () => void;
+  /** Real file attachments; the attach button opens a file picker and images can be pasted. */
+  attach?: AttachSupport;
   /** While set, the send button becomes Stop (e.g. the assistant is answering). */
   onStop?: () => void;
 };
@@ -43,8 +58,11 @@ export function ChatInput({
   textareaRef,
   placeholder = "Type a message…",
   onAttach,
+  attach,
   onStop,
 }: ChatInputProps) {
+  const [files, setFiles] = useState<PendingFile[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -54,7 +72,9 @@ export function ChatInput({
 
   const trimmed = value.trim();
   const tooLong = value.length > CHAT_MESSAGE_MAX_LENGTH;
-  const canSubmit = trimmed.length > 0 && !tooLong && !saving;
+  const preparing = files.some((f) => f.ready === null);
+  const readyFiles = files.flatMap((f) => (f.ready ? [f.ready] : []));
+  const canSubmit = (trimmed.length > 0 || (!editing && readyFiles.length > 0)) && !tooLong && !saving && !preparing;
 
   const resize = () => {
     const el = inputRef.current;
@@ -116,8 +136,36 @@ export function ChatInput({
       return;
     }
     stopTyping();
-    onSend(trimmed);
+    onSend(trimmed, readyFiles.length ? readyFiles : undefined);
     setValue("");
+    setFiles([]);
+  };
+
+  const addFiles = (picked: File[]) => {
+    if (!attach || picked.length === 0) return;
+    const room = attach.max - files.length;
+    if (picked.length > room) toast.error(`You can attach up to ${attach.max} files to one message.`);
+    for (const file of picked.slice(0, Math.max(0, room))) {
+      const id = crypto.randomUUID();
+      setFiles((prev) => [...prev, { id, name: file.name, image: file.type.startsWith("image/"), ready: null }]);
+      attach.prepare(file).then(
+        (ready) => setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ready } : f))),
+        (error: unknown) => {
+          setFiles((prev) => prev.filter((f) => f.id !== id));
+          toast.error("Couldn't attach the file", { description: error instanceof Error ? error.message : file.name });
+        },
+      );
+    }
+    inputRef.current?.focus();
+  };
+
+  // Pasting a screenshot attaches it; pasted text is left to the textarea.
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    if (!attach || editing) return;
+    const pasted = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+    if (pasted.length === 0) return;
+    e.preventDefault();
+    addFiles(pasted);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -156,6 +204,38 @@ export function ChatInput({
         <ChatReplyPreview mode="reply" message={replyingTo} onCancel={onCancelContext} />
       ) : null}
 
+      {files.length > 0 && !editing && (
+        <ul className="flex flex-wrap gap-2 border-t border-line bg-panel px-3 pt-3 sm:px-4" aria-label="Attached files">
+          {files.map((f) => (
+            <li
+              key={f.id}
+              className="flex max-w-60 items-center gap-2 rounded-lg border border-line-bright bg-panel-3 py-1 pr-1 pl-1.5 text-sm text-ink"
+            >
+              {f.ready?.kind === "image" && f.ready.dataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- a local data URL, nothing to optimise
+                <img src={f.ready.dataUrl} alt="" className="size-8 shrink-0 rounded object-cover" />
+              ) : (
+                <span className="flex size-8 shrink-0 items-center justify-center rounded bg-panel text-ink-mute" aria-hidden="true">
+                  {f.ready === null ? <Loader2 className="size-4 animate-spin" /> : f.image ? <ImageIcon className="size-4" /> : <FileText className="size-4" />}
+                </span>
+              )}
+              <span className="min-w-0 truncate" title={f.name}>
+                {f.name}
+                {f.ready === null && <span className="sr-only"> (preparing)</span>}
+              </span>
+              <button
+                type="button"
+                onClick={() => setFiles((prev) => prev.filter((p) => p.id !== f.id))}
+                className="flex size-6 shrink-0 items-center justify-center rounded text-ink-mute hover:bg-panel hover:text-ink"
+                aria-label={`Remove ${f.name}`}
+              >
+                <X className="size-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
       <form
         className="flex items-end gap-2 border-t border-line bg-panel px-3 py-3 sm:px-4"
         onSubmit={(e) => {
@@ -171,11 +251,26 @@ export function ChatInput({
           align="start"
           className="mb-0.5 size-9"
         />
-        {onAttach && (
+        {attach && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={attach.accept}
+            multiple
+            hidden
+            data-testid="chat-file-input"
+            onChange={(e) => {
+              addFiles(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
+          />
+        )}
+        {(attach || onAttach) && (
           <button
             type="button"
-            onClick={onAttach}
-            className="mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-panel-3 hover:text-ink"
+            onClick={attach ? () => fileInputRef.current?.click() : onAttach}
+            disabled={Boolean(attach && (editing || files.length >= attach.max))}
+            className="mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-panel-3 hover:text-ink disabled:pointer-events-none disabled:opacity-40"
             aria-label="Attach a file"
             title="Attach a file"
           >
@@ -193,6 +288,7 @@ export function ChatInput({
             rows={1}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={onKeyDown}
+            onPaste={onPaste}
             onBlur={stopTyping}
             placeholder={editing ? "Edit your message…" : placeholder}
             aria-invalid={tooLong || undefined}
