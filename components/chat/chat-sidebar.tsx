@@ -2,6 +2,8 @@
 
 import { Hash, MessageSquareText, Search, SquarePen, UserPlus, X } from "lucide-react";
 import { useMemo, type Ref } from "react";
+import { CallButtons } from "@/components/calls/call-buttons";
+import { Avatar } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,12 +11,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ChatWorkspace } from "@/hooks/use-chat-workspace";
-import { cn } from "@/lib/utils";
+import { cn, fullName } from "@/lib/utils";
 import type { ChatContact } from "@/types/chat";
 import { chatIconButton } from "./chat-reaction-picker";
 import { ChatSearchResults } from "./chat-search-results";
 import { ChatSidebarSection } from "./chat-sidebar-section";
 import { ConversationListItem } from "./conversation-list-item";
+import { PresenceDot, PRESENCE_LABEL } from "./presence-dot";
 
 export const THREADS_ID = "threads";
 
@@ -46,6 +49,10 @@ export function ChatSidebar({
   const assistant = workspace.conversations.find((c) => c.kind === "assistant");
   const channels = workspace.conversations.filter((c) => c.kind === "channel");
   const directs = workspace.conversations.filter((c) => c.kind === "direct");
+  // Real team members (online first): the people you can call.
+  const team = workspace.contacts
+    .filter((c) => c.callable)
+    .sort((a, b) => Number(b.presence === "online") - Number(a.presence === "online"));
   const unread = (list: typeof channels) => list.reduce((n, c) => n + (c.muted ? 0 : c.unread), 0);
   const { search } = workspace;
   const results = useMemo(() => (query.trim() ? search(query) : null), [query, search]);
@@ -151,6 +158,21 @@ export function ChatSidebar({
               </li>
             </ChatSidebarSection>
 
+            <ChatSidebarSection title="Team">
+              {team.length === 0 ? (
+                <li className="px-2 py-1.5 text-xs text-ink-mute">No other team members yet. Invite someone to message and call them.</li>
+              ) : (
+                team.map((person) => (
+                  <TeamMember
+                    key={person.id}
+                    person={person}
+                    active={selectedId === `dm-${person.id}`}
+                    onOpen={() => onOpenPerson(person)}
+                  />
+                ))
+              )}
+            </ChatSidebarSection>
+
             <ChatSidebarSection title="Direct messages" addLabel="New direct message" onAdd={onNewChat} unread={unread(directs)}>
               {directs.map((c) => (
                 <ConversationListItem key={c.id} conversation={c} active={c.id === selectedId} onSelect={onSelect} />
@@ -172,5 +194,29 @@ export function ChatSidebar({
         )}
       </nav>
     </aside>
+  );
+}
+
+/** A real team member: opens your conversation with them, and calls them straight from the list. */
+function TeamMember({ person, active, onOpen }: { person: ChatContact; active: boolean; onOpen: () => void }) {
+  return (
+    <li className={cn("group flex items-center rounded-md transition-colors", active ? "bg-cyan/10" : "hover:bg-panel-3")}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-current={active ? "page" : undefined}
+        className={cn("flex h-9 min-w-0 flex-1 items-center gap-2.5 px-2 text-left text-sm", active ? "font-semibold text-ink" : "text-ink-dim hover:text-ink")}
+        aria-label={`${fullName(person)}, ${PRESENCE_LABEL[person.presence]}. Open conversation`}
+      >
+        <span className="relative shrink-0">
+          <Avatar user={person} size="xs" />
+          <PresenceDot presence={person.presence} className="absolute -right-0.5 -bottom-0.5" decorative />
+        </span>
+        <span className="truncate">{fullName(person)}</span>
+      </button>
+      <span className="flex shrink-0 pr-1 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100">
+        <CallButtons peer={person} className="size-7" />
+      </span>
+    </li>
   );
 }

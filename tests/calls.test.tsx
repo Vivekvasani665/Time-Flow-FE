@@ -314,7 +314,22 @@ describe("Calls in Chat", () => {
     await waitFor(() => expect(fake.sent("call:initiate")).toEqual([{ receiverId: PRIYA.id, type: "VOICE" }]));
   });
 
-  it("shows no call buttons for the sample conversations", async () => {
+  it("lists real team members in the chat list, with video calling right from the row", async () => {
+    setSearchParams();
+    renderWithProviders(
+      <CallProvider>
+        <ChatPage />
+      </CallProvider>,
+      { user: ME },
+    );
+    const nav = within(screen.getByRole("navigation", { name: "Channels and direct messages" }));
+    fireEvent.click(await nav.findByRole("button", { name: "Start a video call with Priya" }));
+    await waitFor(() => expect(fake.sent("call:initiate")).toEqual([{ receiverId: PRIYA.id, type: "VIDEO" }]));
+    // The sample contacts aren't in Team: they can't be called.
+    expect(nav.queryByRole("button", { name: /Start a video call with Rahul/ })).not.toBeInTheDocument();
+  });
+
+  it("shows the call buttons disabled, with the reason, for the sample conversations", async () => {
     setSearchParams({ c: "dm-user-1" });
     renderWithProviders(
       <CallProvider>
@@ -324,6 +339,9 @@ describe("Calls in Chat", () => {
     );
     const pane = within(await screen.findByRole("region", { name: "Conversation" }));
     expect(await pane.findByRole("heading", { name: "Rahul Sharma" })).toBeInTheDocument();
-    expect(pane.queryByRole("button", { name: /Start a voice call/ })).not.toBeInTheDocument();
+    const video = pane.getByRole("button", { name: "Start a video call with Rahul" });
+    expect(video).toBeDisabled();
+    expect(video).toHaveAttribute("title", expect.stringMatching(/real team members/));
+    expect(pane.getByRole("button", { name: "Start a voice call with Rahul" })).toBeDisabled();
   });
 });

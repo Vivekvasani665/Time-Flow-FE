@@ -159,7 +159,11 @@ export function MockConversation({ conversation, workspace, focusId, onBack, onS
         onToggleMute={() => workspace.toggleMute(id)}
         onMarkRead={() => markRead(id)}
       >
-        {callable && <CallButtons peer={callable} />}
+        {callable ? (
+          <CallButtons peer={callable} />
+        ) : conversation.kind === "direct" && contact ? (
+          <CallButtons peer={contact} disabledReason="Sample contact — calls work with real team members (see Team in the chat list)" />
+        ) : null}
       </ConversationHeader>
       <ConversationPanel
         controller={controller}
