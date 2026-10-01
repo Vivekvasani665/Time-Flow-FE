@@ -50,7 +50,7 @@ const recording = (overrides: Partial<Recording> = {}): Recording => ({
 
 beforeEach(() => {
   service.list.mockResolvedValue({
-    items: [recording(), recording({ id: "r2", title: "Bug repro", owner: { id: "u2", firstName: "Zoe", lastName: "Chen", email: "z@t.dev", avatarUrl: null }, project: null, recordingType: "BROWSER_TAB", canDelete: false, duration: 3725 })],
+    items: [recording(), recording({ id: "r2", title: "Bug repro", owner: { id: "u2", firstName: "Zoe", lastName: "Chen", email: "z@t.dev", avatarUrl: null }, project: null, recordingType: "WEBCAM", canDelete: false, duration: 3725 })],
     meta: { page: 1, limit: 12, total: 2, totalPages: 1 },
   });
 });
@@ -69,7 +69,8 @@ describe("Recordings page", () => {
     expect(screen.getAllByText("Apollo").length).toBeGreaterThan(0);
     expect(screen.getByText("You")).toBeInTheDocument();
     expect(screen.getByText("Zoe Chen")).toBeInTheDocument();
-    expect(screen.getByText("Screen + camera")).toBeInTheDocument();
+    expect(screen.getByText("Full Screen + Webcam")).toBeInTheDocument();
+    expect(screen.getByText("Webcam Only")).toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "Search recordings" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "New Recording" }).length).toBeGreaterThan(0);
     expect(service.list).toHaveBeenCalledWith(expect.objectContaining({ limit: 12, sortBy: "createdAt", sortOrder: "desc" }));
@@ -165,11 +166,11 @@ describe("useSaveRecording", () => {
     const thumbnail = new Blob(["t"], { type: "image/jpeg" });
 
     await act(async () => {
-      await result.current.mutateAsync({ video, thumbnail, details: { title: "Demo", recordingType: "WINDOW", duration: 9, tags: [], projectId: "p1" } });
+      await result.current.mutateAsync({ video, thumbnail, details: { title: "Demo", recordingType: "FULL_SCREEN", duration: 9, tags: [], projectId: "p1" } });
     });
 
     expect(order).toEqual(["upload-url", "put https://bucket.example/video", "put https://bucket.example/thumb", "complete"]);
-    expect(service.createUpload).toHaveBeenCalledWith({ mimeType: "video/webm", fileSize: 100, recordingType: "WINDOW", projectId: "p1", thumbnail: { mimeType: "image/jpeg", fileSize: 1 } });
+    expect(service.createUpload).toHaveBeenCalledWith({ mimeType: "video/webm", fileSize: 100, recordingType: "FULL_SCREEN", projectId: "p1", thumbnail: { mimeType: "image/jpeg", fileSize: 1 } });
     expect(service.complete).toHaveBeenCalledWith(expect.objectContaining({ recordingId: "rec-1", title: "Demo", duration: 9 }));
     await waitFor(() => expect(result.current.progress).toBe(0.5));
   });

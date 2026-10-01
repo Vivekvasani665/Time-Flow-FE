@@ -11,6 +11,7 @@ import { useSaveRecording } from "@/hooks/use-recordings";
 import { useScreenRecorder, type RecorderSettings } from "@/hooks/use-screen-recorder";
 import { describeError } from "@/lib/api/errors";
 import { DEFAULT_WEBCAM_LAYOUT } from "@/lib/recording/compositor";
+import { isRecordingType } from "@/lib/recording/media-support";
 import { hasUnsavedRecording, isErrorState, type RecorderErrorStatus } from "@/lib/recording/recording-state";
 import { captureThumbnail } from "@/lib/recording/thumbnail";
 import { StorageUploadError } from "@/services/recordings.service";
@@ -47,7 +48,9 @@ function readSettings(): RecorderSettings {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const saved = JSON.parse(raw) as Partial<RecorderSettings>;
-    return { ...DEFAULT_SETTINGS, ...saved, webcam: { ...DEFAULT_WEBCAM_LAYOUT, ...saved.webcam } };
+    // Settings saved before window / tab recording was removed fall back to Full Screen.
+    const mode = isRecordingType(saved.mode) ? saved.mode : DEFAULT_SETTINGS.mode;
+    return { ...DEFAULT_SETTINGS, ...saved, mode, webcam: { ...DEFAULT_WEBCAM_LAYOUT, ...saved.webcam } };
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -169,7 +172,9 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
           onLayoutChange={recorder.setWebcamLayout}
           cameraOn={recorder.cameraOn}
           cameraOnly={recorder.recordingType === "WEBCAM"}
-          defaultMinimized={recorder.captureSurface === "browser"}
+          // The whole screen is being recorded: an on-page preview would appear in the video
+          // next to the camera bubble drawn into it, so it starts tucked away.
+          defaultMinimized={recorder.recordingType === "SCREEN_WEBCAM"}
         />
       )}
 

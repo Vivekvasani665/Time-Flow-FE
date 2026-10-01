@@ -83,7 +83,7 @@ describe("capture errors and support", () => {
   });
 
   it("says why a mode can't run", () => {
-    const full: BrowserSupport = { secureContext: true, userMedia: true, displayMedia: true, mediaRecorder: true, canvasCapture: true, webAudio: true, systemAudio: "tab-only" };
+    const full: BrowserSupport = { secureContext: true, userMedia: true, displayMedia: true, mediaRecorder: true, canvasCapture: true, webAudio: true, systemAudio: false };
     expect(unsupportedReason("SCREEN_WEBCAM", full)).toBeNull();
     expect(unsupportedReason("FULL_SCREEN", { ...full, displayMedia: false })).toMatch(/share your screen/);
     expect(unsupportedReason("WEBCAM", { ...full, displayMedia: false })).toBeNull();

@@ -90,7 +90,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   FakeMediaRecorder.instances = [];
   FakeMediaRecorder.supported = (type) => type.startsWith("video/webm");
-  screen = new FakeStream([new FakeTrack("video", { displaySurface: "window", width: 1920, height: 1080 })]);
+  screen = new FakeStream([new FakeTrack("video", { displaySurface: "monitor", width: 1920, height: 1080 })]);
   microphone = new FakeStream([new FakeTrack("audio")]);
   camera = new FakeStream([new FakeTrack("video", { width: 1280, height: 720 })]);
   getDisplayMedia.mockReset().mockImplementation(async () => screen);
@@ -126,10 +126,27 @@ describe("useScreenRecorder", () => {
     const { result } = renderHook(() => useScreenRecorder());
     await startAndCountDown(result);
 
-    expect(getDisplayMedia).toHaveBeenCalledWith(expect.objectContaining({ video: expect.objectContaining({ displaySurface: "monitor" }), audio: false }));
+    // Asks for an entire screen, with this tab and "share this tab instead" kept out of the picker.
+    expect(getDisplayMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        video: expect.objectContaining({ displaySurface: "monitor" }),
+        audio: false,
+        monitorTypeSurfaces: "include",
+        selfBrowserSurface: "exclude",
+        surfaceSwitching: "exclude",
+      }),
+    );
     expect(result.current.status).toBe("RECORDING");
-    // The browser's picker chose a window: the recording says so.
-    expect(result.current.recordingType).toBe("WINDOW");
+    expect(result.current.recordingType).toBe("FULL_SCREEN");
+
+    // Switching to other tabs or apps hides this page; the recording carries on.
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await act(async () => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(result.current.status).toBe("RECORDING");
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
     const recorder = FakeMediaRecorder.instances[0]!;
     expect(recorder.options.mimeType).toBe("video/webm;codecs=vp9,opus");
     expect(recorder.stream.getVideoTracks()).toEqual(screen.getVideoTracks());
@@ -151,7 +168,7 @@ describe("useScreenRecorder", () => {
       await Promise.resolve();
     });
     expect(result.current.status).toBe("PREVIEW");
-    expect(result.current.result).toMatchObject({ url: "blob:recording-1", mimeType: "video/webm", recordingType: "WINDOW" });
+    expect(result.current.result).toMatchObject({ url: "blob:recording-1", mimeType: "video/webm", recordingType: "FULL_SCREEN" });
     expect(result.current.getBlob()?.type).toBe("video/webm");
     // Every track is stopped once recording ends.
     for (const track of [...screen.tracks, ...microphone.tracks]) expect(track.stop).toHaveBeenCalled();
@@ -165,7 +182,7 @@ describe("useScreenRecorder", () => {
     expect(result.current.getBlob()).toBeNull();
   });
 
-  it("stops when the user ends sharing from the browser's own controls", async () => {
+  it("stops and opens the preview, keeping the video, when sharing ends from the browser's own controls", async () => {
     const { result } = renderHook(() => useScreenRecorder());
     await startAndCountDown(result);
     await act(async () => {
@@ -173,6 +190,21 @@ describe("useScreenRecorder", () => {
       await Promise.resolve();
     });
     expect(result.current.status).toBe("PREVIEW");
+    expect(result.current.getBlob()?.size).toBeGreaterThan(0);
+    expect(microphone.tracks[0]!.stop).toHaveBeenCalled();
+  });
+
+  it.each(["window", "browser"])("refuses a %s picked instead of an entire screen, before asking for the microphone", async (surface) => {
+    screen = new FakeStream([new FakeTrack("video", { displaySurface: surface })]);
+    const { result } = renderHook(() => useScreenRecorder());
+    await act(async () => {
+      await result.current.start(settings());
+    });
+    expect(result.current.status).toBe("SCREEN_CAPTURE_ERROR");
+    expect(result.current.error).toMatch(/Entire Screen/);
+    expect(screen.tracks[0]!.stop).toHaveBeenCalled();
+    expect(getUserMedia).not.toHaveBeenCalled();
+    expect(FakeMediaRecorder.instances).toHaveLength(0);
   });
 
   it("records the camera alone in webcam mode", async () => {

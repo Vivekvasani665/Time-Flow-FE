@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioMixer, needsMixing } from "@/lib/recording/audio-mixer";
 import { Compositor, DEFAULT_WEBCAM_LAYOUT, type WebcamLayout } from "@/lib/recording/compositor";
-import { containerOf, detectSupport, explainCaptureError, pickMimeType, RECORDING_MODES, RecorderError, unsupportedReason } from "@/lib/recording/media-support";
+import { containerOf, detectSupport, explainCaptureError, NOT_ENTIRE_SCREEN, pickMimeType, RECORDING_MODES, RecorderError, unsupportedReason } from "@/lib/recording/media-support";
 import { isCapturing, isErrorState, transition, type RecorderErrorStatus, type RecorderEvent, type RecorderState } from "@/lib/recording/recording-state";
 import type { RecordingType } from "@/types/recording";
 
@@ -34,14 +34,8 @@ const NO_STREAMS: Streams = { screen: null, camera: null, microphone: null };
 
 const stopStream = (stream: MediaStream | null) => stream?.getTracks().forEach((t) => t.stop());
 
-/** Screen capture → the recording type it really was: the browser's picker can choose a different surface than the mode hinted. */
-function typeForSurface(mode: RecordingType, surface: string | undefined): RecordingType {
-  if (mode !== "FULL_SCREEN" && mode !== "WINDOW" && mode !== "BROWSER_TAB") return mode;
-  if (surface === "monitor") return "FULL_SCREEN";
-  if (surface === "window") return "WINDOW";
-  if (surface === "browser") return "BROWSER_TAB";
-  return mode;
-}
+/** What the user picked in the browser's dialog: "monitor" (an entire screen), "window" or "browser" (a tab). */
+const surfaceOf = (track: MediaStreamTrack | undefined) => (track?.getSettings() as { displaySurface?: string } | undefined)?.displaySurface;
 
 /** About 0.07 bits per pixel per frame, kept between 1.5 and 6 Mbps. */
 function videoBitrate(track: MediaStreamTrack | undefined) {
@@ -51,8 +45,10 @@ function videoBitrate(track: MediaStreamTrack | undefined) {
 }
 
 /**
- * Records the screen, a window, a tab and/or the webcam entirely in the
- * browser. Nothing is uploaded here: stopping produces a local Blob and an
+ * Records the entire screen and/or the webcam entirely in the browser. Only a
+ * whole display is accepted — never one window or tab — so the recording
+ * carries on while the user switches between tabs and applications, until
+ * they press Stop or end sharing from the browser's own controls. Nothing is uploaded here: stopping produces a local Blob and an
  * object URL for the preview, and saving is a separate, explicit step.
  */
 export function useScreenRecorder() {
@@ -65,7 +61,6 @@ export function useScreenRecorder() {
   const [cameraOn, setCameraOn] = useState(true);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [hasMicrophone, setHasMicrophone] = useState(false);
-  const [captureSurface, setCaptureSurface] = useState<string | null>(null);
   const [recordingType, setRecordingType] = useState<RecordingType | null>(null);
   const [webcamLayout, setWebcamLayoutState] = useState<WebcamLayout>(DEFAULT_WEBCAM_LAYOUT);
   const [result, setResult] = useState<RecordingResult | null>(null);
@@ -251,20 +246,26 @@ export function useScreenRecorder() {
       if (!mimeType) return fail("BROWSER_NOT_SUPPORTED", "This browser can't record in a format TimeFlow can save (WebM or MP4). Use the latest Chrome, Edge, Firefox or Safari.");
 
       const streams: Streams = { screen: null, camera: null, microphone: null };
-      const wantsSystemAudio = settings.systemAudio && mode.screen && support.systemAudio !== "none";
+      const wantsSystemAudio = settings.systemAudio && mode.screen && support.systemAudio;
       try {
         // Screen first: the browser only opens its picker in direct response to the click.
         if (mode.screen) {
           try {
             streams.screen = await navigator.mediaDevices.getDisplayMedia({
-              video: { displaySurface: mode.displaySurface, frameRate: { ideal: 30 } },
+              // Opens the browser's picker on its "Entire Screen" choices.
+              video: { displaySurface: "monitor", frameRate: { ideal: 30 } },
               audio: wantsSystemAudio,
-              // Chromium-only hints; other browsers ignore unknown members.
-              ...({ selfBrowserSurface: "include", surfaceSwitching: "include", systemAudio: wantsSystemAudio ? "include" : "exclude", monitorTypeSurfaces: "include" } as object),
+              // Chromium-only hints; other browsers ignore unknown members. Keep this tab out of
+              // the list and drop "share this tab instead", which would switch to a single tab.
+              ...({ monitorTypeSurfaces: "include", selfBrowserSurface: "exclude", surfaceSwitching: "exclude", systemAudio: wantsSystemAudio ? "include" : "exclude" } as object),
             } as DisplayMediaStreamOptions);
           } catch (e) {
             throw explainCaptureError(e, "screen");
           }
+          // Browsers still list windows and tabs in the picker; only a whole display is accepted.
+          // (Browsers that don't report the surface are trusted with the user's choice.)
+          const surface = surfaceOf(streams.screen.getVideoTracks()[0]);
+          if (surface && surface !== "monitor") throw NOT_ENTIRE_SCREEN;
           // 4K screens make very large files; 1080p is plenty for a walkthrough.
           await streams.screen
             .getVideoTracks()[0]
@@ -308,19 +309,12 @@ export function useScreenRecorder() {
 
       streamsRef.current = streams;
       const screenTrack = streams.screen?.getVideoTracks()[0];
-      const surface = (screenTrack?.getSettings() as { displaySurface?: string } | undefined)?.displaySurface;
-      const type = typeForSurface(settings.mode, surface);
-      typeRef.current = type;
-      setRecordingType(type);
-      setCaptureSurface(surface ?? null);
+      typeRef.current = settings.mode;
+      setRecordingType(settings.mode);
       if (wantsSystemAudio && !streams.screen?.getAudioTracks().length) {
-        setNotice(
-          surface === "browser"
-            ? "Tab audio wasn't shared, so only your microphone is recorded. Next time, tick “Also share tab audio” in the browser's dialog."
-            : "System audio isn't available for this choice, so only your microphone is recorded. Share a browser tab to capture its sound.",
-        );
-      } else if (settings.systemAudio && mode.screen && support.systemAudio === "none") {
-        setNotice("This browser can't record system or tab audio; your microphone is still recorded.");
+        setNotice("System audio wasn't shared, so only your microphone is recorded. Next time, turn on “Share system audio” in the browser's dialog.");
+      } else if (settings.systemAudio && mode.screen && !support.systemAudio) {
+        setNotice("This browser can't record system audio from an entire screen; your microphone is still recorded.");
       }
 
       // ── Build the stream that gets recorded ──
@@ -336,7 +330,7 @@ export function useScreenRecorder() {
         }
       } catch {
         releaseMedia();
-        return fail("RECORDING_FAILED", "Your screen and camera couldn't be combined in this browser. Record them separately instead.");
+        return fail("RECORDING_FAILED", "Your screen and camera couldn't be combined in this browser. Choose Full Screen or Webcam Only instead.");
       }
       let audioTrack: MediaStreamTrack | null = null;
       if (needsMixing(streams.microphone, streams.screen) && support.webAudio) {
@@ -463,7 +457,6 @@ export function useScreenRecorder() {
     setError(null);
     setNotice(null);
     setRecordingType(null);
-    setCaptureSurface(null);
     send({ type: "RESET" });
   }, [releaseMedia, releaseResult, send]);
 
@@ -508,7 +501,6 @@ export function useScreenRecorder() {
     cameraOn,
     hasMicrophone,
     cameraStream,
-    captureSurface,
     recordingType,
     webcamLayout,
     result,

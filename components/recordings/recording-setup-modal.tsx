@@ -22,8 +22,6 @@ type Props = {
   onStart: (settings: RecorderSettings) => void;
 };
 
-const SCREEN_ONLY: RecordingType[] = ["FULL_SCREEN", "WINDOW", "BROWSER_TAB"];
-
 const SIZES: { value: WebcamSize; label: string }[] = [
   { value: "sm", label: "S" },
   { value: "md", label: "M" },
@@ -95,7 +93,6 @@ function LayoutPreview({ settings, stream, onChange }: { settings: RecorderSetti
 
 export function RecordingSetupModal({ open, onOpenChange, initial, onStart }: Props) {
   const [settings, setSettings] = useState<RecorderSettings>(initial);
-  const [lastScreenMode, setLastScreenMode] = useState<RecordingType>(SCREEN_ONLY.includes(initial.mode) ? initial.mode : "FULL_SCREEN");
   const [support, setSupport] = useState<BrowserSupport | null>(null);
   const devices = useMediaDevices(open);
 
@@ -116,14 +113,12 @@ export function RecordingSetupModal({ open, onOpenChange, initial, onStart }: Pr
 
   const update = (patch: Partial<RecorderSettings>) => setSettings((s) => ({ ...s, ...patch }));
 
-  const selectMode = (next: RecordingType) => {
-    if (SCREEN_ONLY.includes(next)) setLastScreenMode(next);
-    update({ mode: next });
-  };
+  const selectMode = (next: RecordingType) => update({ mode: next });
 
+  /** The camera switch moves between Full Screen and Full Screen + Webcam. */
   const setCamera = (on: boolean) => {
     if (settings.mode === "WEBCAM") return;
-    update({ mode: on ? "SCREEN_WEBCAM" : lastScreenMode });
+    update({ mode: on ? "SCREEN_WEBCAM" : "FULL_SCREEN" });
   };
 
   const cameras = devices.cameras.filter((d) => d.deviceId);
@@ -141,21 +136,14 @@ export function RecordingSetupModal({ open, onOpenChange, initial, onStart }: Pr
     return null;
   }, [support, settings.mode, settings.microphone, mode.camera, noCamera, preview.problem]);
 
-  const systemAudioNote =
-    !support || !mode.screen
-      ? "Only for screen recordings"
-      : support.systemAudio === "none"
-        ? "Not supported in this browser"
-        : support.systemAudio === "tab-only"
-          ? "Available when you share a browser tab"
-          : "Tab audio, or your whole system's sound";
+  const systemAudioNote = !support || !mode.screen ? "Only for screen recordings" : support.systemAudio ? "Sound playing on your computer" : "Not available on this browser / system";
 
   return (
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
       title="New recording"
-      description="Choose what to capture. Nothing is uploaded until you review the recording and save it."
+      description="Your entire screen is recorded, so you can switch between tabs and apps freely. Nothing is uploaded until you review the recording and save it."
       className="max-h-[calc(100dvh-2rem)] max-w-3xl overflow-y-auto"
       footer={
         <>
@@ -171,7 +159,7 @@ export function RecordingSetupModal({ open, onOpenChange, initial, onStart }: Pr
       <div className="space-y-6">
         <fieldset>
           <legend className="mb-2.5 text-sm font-medium text-ink">What do you want to record?</legend>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-5">
+          <div role="radiogroup" aria-label="Recording mode" className="grid gap-2.5 sm:grid-cols-3">
             {MODE_ORDER.map((type) => {
               const info = RECORDING_MODES[type];
               const Icon = RECORDING_TYPE_ICON[type];
@@ -241,7 +229,8 @@ export function RecordingSetupModal({ open, onOpenChange, initial, onStart }: Pr
                   })()}
                 </span>
                 <p className="text-sm text-ink-dim">
-                  After you press <span className="font-medium text-ink">Start recording</span>, your browser will ask which {settings.mode === "WINDOW" ? "window" : settings.mode === "BROWSER_TAB" ? "tab" : "screen"} to share.
+                  After you press <span className="font-medium text-ink">Start recording</span>, your browser asks what to share — choose{" "}
+                  <span className="font-medium text-ink">Entire Screen</span>. Recording continues as you move between tabs and apps, until you press Stop.
                 </p>
               </div>
             )}
@@ -301,8 +290,8 @@ export function RecordingSetupModal({ open, onOpenChange, initial, onStart }: Pr
               icon={Volume2}
               label="System audio"
               description={systemAudioNote}
-              checked={settings.systemAudio && mode.screen && support?.systemAudio !== "none"}
-              disabled={!mode.screen || support?.systemAudio === "none"}
+              checked={settings.systemAudio && mode.screen && Boolean(support?.systemAudio)}
+              disabled={!mode.screen || !support?.systemAudio}
               onCheckedChange={(systemAudio) => update({ systemAudio })}
             />
 
