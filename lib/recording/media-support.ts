@@ -17,19 +17,32 @@ export type ModeInfo = {
   description: string;
   screen: boolean;
   camera: boolean;
-  /** Hint for the browser's picker; the user still chooses in the browser's own dialog. */
-  displaySurface?: "monitor" | "window" | "browser";
 };
 
+/**
+ * Only the entire display is ever recorded — never a single window or tab — so
+ * a recording keeps going while the user moves between tabs and applications.
+ * The user still chooses which display, in the browser's own sharing dialog.
+ */
 export const RECORDING_MODES: Record<RecordingType, ModeInfo> = {
-  FULL_SCREEN: { label: "Full screen", description: "Your entire display", screen: true, camera: false, displaySurface: "monitor" },
-  WINDOW: { label: "Window", description: "A single app window", screen: true, camera: false, displaySurface: "window" },
-  BROWSER_TAB: { label: "Browser tab", description: "One tab, with its sound", screen: true, camera: false, displaySurface: "browser" },
-  SCREEN_WEBCAM: { label: "Screen + camera", description: "Screen with your face in a bubble", screen: true, camera: true, displaySurface: "monitor" },
-  WEBCAM: { label: "Camera only", description: "Just you, on camera", screen: false, camera: true },
+  FULL_SCREEN: {
+    label: "Full Screen",
+    description: "Record your selected display continuously while you work across browser tabs and applications.",
+    screen: true,
+    camera: false,
+  },
+  SCREEN_WEBCAM: {
+    label: "Full Screen + Webcam",
+    description: "Your entire display, with your camera in a bubble on top.",
+    screen: true,
+    camera: true,
+  },
+  WEBCAM: { label: "Webcam Only", description: "Just you, on camera.", screen: false, camera: true },
 };
 
-export const MODE_ORDER: RecordingType[] = ["FULL_SCREEN", "WINDOW", "BROWSER_TAB", "SCREEN_WEBCAM", "WEBCAM"];
+export const MODE_ORDER: RecordingType[] = ["FULL_SCREEN", "SCREEN_WEBCAM", "WEBCAM"];
+
+export const isRecordingType = (value: unknown): value is RecordingType => MODE_ORDER.includes(value as RecordingType);
 
 export type BrowserSupport = {
   secureContext: boolean;
@@ -38,8 +51,8 @@ export type BrowserSupport = {
   mediaRecorder: boolean;
   canvasCapture: boolean;
   webAudio: boolean;
-  /** Best guess: the browser can share audio from a tab (Chromium) or the whole system (Chromium on Windows / ChromeOS). */
-  systemAudio: "tab-and-system" | "tab-only" | "none";
+  /** Whether sharing an entire screen can include system sound: Chromium on Windows and ChromeOS only. */
+  systemAudio: boolean;
 };
 
 export function detectSupport(): BrowserSupport {
@@ -47,7 +60,6 @@ export function detectSupport(): BrowserSupport {
   const win = typeof window === "undefined" ? undefined : window;
   const ua = nav?.userAgent ?? "";
   const chromium = /Chrome\/|Chromium\/|Edg\//.test(ua) && !/Firefox\//.test(ua);
-  const windowsOrChromeOs = /Windows|CrOS/.test(ua);
   return {
     secureContext: Boolean(win?.isSecureContext),
     userMedia: Boolean(nav?.mediaDevices?.getUserMedia),
@@ -55,7 +67,7 @@ export function detectSupport(): BrowserSupport {
     mediaRecorder: typeof MediaRecorder !== "undefined",
     canvasCapture: typeof HTMLCanvasElement !== "undefined" && "captureStream" in HTMLCanvasElement.prototype,
     webAudio: typeof AudioContext !== "undefined",
-    systemAudio: chromium ? (windowsOrChromeOs ? "tab-and-system" : "tab-only") : "none",
+    systemAudio: chromium && /Windows|CrOS/.test(ua),
   };
 }
 
@@ -66,7 +78,7 @@ export function unsupportedReason(mode: RecordingType, support: BrowserSupport):
   if (!support.mediaRecorder) return "This browser can't record video. Use the latest Chrome, Edge, Firefox or Safari.";
   if (info.screen && !support.displayMedia) return "This browser can't share your screen. Use Chrome, Edge or Firefox on a computer.";
   if (info.camera && !support.userMedia) return "This browser can't use a camera.";
-  if (info.screen && info.camera && !support.canvasCapture) return "This browser can't combine your screen and camera. Record them separately instead.";
+  if (info.screen && info.camera && !support.canvasCapture) return "This browser can't combine your screen and camera. Choose Full Screen or Webcam Only instead.";
   return null;
 }
 
@@ -105,6 +117,12 @@ export const extensionFor = (mimeType: string) => (containerOf(mimeType) === "vi
 const errorName = (error: unknown) => (error instanceof DOMException || error instanceof Error ? error.name : "");
 
 /** Turns a getDisplayMedia / getUserMedia failure into something the user can act on. */
+/** The user picked a window or tab in the browser's dialog instead of an entire screen. */
+export const NOT_ENTIRE_SCREEN = new RecorderError(
+  "SCREEN_CAPTURE_ERROR",
+  "TimeFlow records your entire screen, so recording keeps going while you switch tabs and apps. In the browser's dialog, choose “Entire Screen” (not a window or tab) and try again.",
+);
+
 export function explainCaptureError(error: unknown, source: "screen" | "camera" | "microphone"): RecorderError {
   if (error instanceof RecorderError) return error;
   const name = errorName(error);
@@ -112,11 +130,11 @@ export function explainCaptureError(error: unknown, source: "screen" | "camera" 
     if (name === "NotAllowedError" || name === "PermissionDeniedError") {
       return new RecorderError(
         "PERMISSION_DENIED",
-        "Screen sharing was cancelled or blocked. Choose a screen, window or tab in the browser's dialog — on macOS, also allow your browser under System Settings → Privacy & Security → Screen Recording.",
+        "Screen sharing was cancelled or blocked. Choose “Entire Screen” in the browser's dialog — on macOS, also allow your browser under System Settings → Privacy & Security → Screen Recording.",
       );
     }
     if (name === "NotSupportedError" || name === "TypeError") return new RecorderError("BROWSER_NOT_SUPPORTED", "This browser can't share your screen. Use Chrome, Edge or Firefox on a computer.");
-    return new RecorderError("SCREEN_CAPTURE_ERROR", "Your screen couldn't be captured. Try again, or pick a different window or tab.");
+    return new RecorderError("SCREEN_CAPTURE_ERROR", "Your screen couldn't be captured. Try again, and choose “Entire Screen” in the browser's dialog.");
   }
   const device = source === "camera" ? "camera" : "microphone";
   const status: RecorderErrorStatus = source === "camera" ? "CAMERA_ERROR" : "MICROPHONE_ERROR";

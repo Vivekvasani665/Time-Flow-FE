@@ -1,4 +1,4 @@
-import { AppWindow, Globe, Monitor, MonitorPlay, Webcam, type LucideIcon } from "lucide-react";
+import { Monitor, MonitorPlay, Webcam, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import type { Tone } from "@/lib/labels";
@@ -8,16 +8,12 @@ import type { RecordingType } from "@/types/recording";
 
 export const RECORDING_TYPE_ICON: Record<RecordingType, LucideIcon> = {
   FULL_SCREEN: Monitor,
-  WINDOW: AppWindow,
-  BROWSER_TAB: Globe,
   SCREEN_WEBCAM: MonitorPlay,
   WEBCAM: Webcam,
 };
 
 const TONE: Record<RecordingType, Tone> = {
   FULL_SCREEN: "blue",
-  WINDOW: "violet",
-  BROWSER_TAB: "cyan",
   SCREEN_WEBCAM: "magenta",
   WEBCAM: "lime",
 };

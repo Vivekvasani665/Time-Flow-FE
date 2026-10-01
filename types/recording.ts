@@ -1,6 +1,7 @@
 import type { ListParams, UserRef } from "./api";
 
-export type RecordingType = "FULL_SCREEN" | "WINDOW" | "BROWSER_TAB" | "SCREEN_WEBCAM" | "WEBCAM";
+/** The entire display, the display with a webcam bubble, or the webcam alone. Window / tab capture is not offered. */
+export type RecordingType = "FULL_SCREEN" | "SCREEN_WEBCAM" | "WEBCAM";
 
 export type Recording = {
   id: string;

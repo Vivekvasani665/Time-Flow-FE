@@ -59,7 +59,12 @@ function hiddenVideo(stream: MediaStream): HTMLVideoElement {
   video.muted = true;
   video.playsInline = true;
   video.srcObject = stream;
-  void video.play().catch(() => undefined);
+  const play = () => void video.play().catch(() => undefined);
+  // Some browsers pause off-screen players when the user switches tabs; the recording must not freeze.
+  video.addEventListener("pause", () => {
+    if (video.srcObject) play();
+  });
+  play();
   return video;
 }
 
