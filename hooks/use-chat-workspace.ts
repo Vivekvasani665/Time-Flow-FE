@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
-import { buildMockMessages, directConversationId, INITIAL_CONVERSATIONS, MOCK_CONTACTS } from "@/lib/chat-mock";
+import { directConversationId, INITIAL_CONVERSATIONS } from "@/lib/chat-conversations";
 import { fullName } from "@/lib/utils";
 import type { ChatContact, ChatConversation, ChatMessage, ChatMessageView, ChatUser, CreateChannelInput } from "@/types/chat";
 import { useCallContacts } from "./use-call-contacts";
@@ -21,7 +21,7 @@ const slug = (name: string) =>
     .replace(/^-|-$/g, "");
 
 /**
- * Channels, direct messages and their (mock) messages.
+ * Channels, direct messages and their messages (kept locally, apart from `# General`).
  *
  * TODO(api): this is the seam for the real backend. Load `conversations` from
  * GET /api/chat/conversations and each conversation's messages from
@@ -37,12 +37,9 @@ export function useChatWorkspace() {
   const [conversations, setConversations] = useState<ChatConversation[]>(INITIAL_CONVERSATIONS);
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
 
-  // Real team members first (they can be called), then the local sample contacts.
+  // The real team members: the people you can message and call.
   const contacts: ChatContact[] = useMemo(
-    () => [
-      ...team.map(({ online, ...u }): ChatContact => ({ ...u, presence: online ? "online" : "offline", callable: true })),
-      ...MOCK_CONTACTS,
-    ],
+    () => team.map(({ online, ...u }): ChatContact => ({ ...u, presence: online ? "online" : "offline", callable: true })),
     [team],
   );
 
@@ -50,11 +47,6 @@ export function useChatWorkspace() {
     () => (user ? { id: user.id, firstName: user.firstName, lastName: user.lastName, avatarUrl: user.avatarUrl } : null),
     [user],
   );
-
-  // Seeded once the signed-in user is known, so "your" mock messages are yours.
-  useEffect(() => {
-    if (me) setMessages((prev) => (Object.keys(prev).length ? prev : buildMockMessages(me)));
-  }, [me]);
 
   const list = useMemo(
     () =>
@@ -135,7 +127,7 @@ export function useChatWorkspace() {
     [conversations],
   );
 
-  // ── Mock message mutations ────────────────────────────────
+  // ── Local message mutations ───────────────────────────────
   const update = useCallback((conversationId: string, fn: (list: ChatMessage[]) => ChatMessage[]) => {
     setMessages((prev) => ({ ...prev, [conversationId]: fn(prev[conversationId] ?? []) }));
   }, []);
@@ -233,8 +225,8 @@ export function useChatWorkspace() {
 
   return {
     me,
-    /** Mock messages are seeded; until then a mock conversation has nothing to show. */
-    ready: Object.keys(messages).length > 0,
+    /** Conversations can be shown once the signed-in user is known. */
+    ready: me !== null,
     conversations: list,
     contacts,
     messages,
