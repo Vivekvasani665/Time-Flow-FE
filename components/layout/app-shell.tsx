@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { CallProvider } from "@/components/calls/call-provider";
+import { RecorderProvider } from "@/components/recordings/recorder-provider";
 import { PreferencesProvider } from "@/components/settings/preferences-provider";
 import { cn } from "@/lib/utils";
 import { BackgroundFx } from "./background-fx";
@@ -36,6 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <AuthProvider>
       <PreferencesProvider>
       <CallProvider>
+      <RecorderProvider>
       <BackgroundFx />
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-md focus:bg-cyan focus:px-3 focus:py-2 focus:text-white">
         Skip to content
@@ -52,6 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
+      </RecorderProvider>
       </CallProvider>
       </PreferencesProvider>
     </AuthProvider>

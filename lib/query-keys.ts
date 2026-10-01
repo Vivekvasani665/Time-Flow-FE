@@ -1,5 +1,6 @@
 import type { EmailListParams } from "@/services/email.service";
 import type { ActivityListParams, JobState, ListParams, ProjectListParams, TaskListParams, UserListParams } from "@/types/api";
+import type { RecordingListParams } from "@/types/recording";
 
 export const queryKeys = {
   me: ["auth", "me"] as const,
@@ -48,6 +49,11 @@ export const queryKeys = {
   calls: {
     contacts: ["calls", "contacts"] as const,
     history: (userId: string) => ["calls", "history", userId] as const,
+  },
+  recordings: {
+    all: ["recordings"] as const,
+    list: (params: RecordingListParams) => ["recordings", "list", params] as const,
+    detail: (id: string) => ["recordings", "detail", id] as const,
   },
   sessions: ["auth", "sessions"] as const,
   twoFactor: ["auth", "2fa"] as const,
